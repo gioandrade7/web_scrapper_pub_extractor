@@ -31,7 +31,7 @@ Para poder utilizar a aplicação, você vai precisar ter instalado a biblioteca
 
 ```bash
 # Clone este repositório
-$ https://github.com/gioandrade7/ner_extension.git
+$ https://github.com/gioandrade7/web_scrapper_pub_extractor.git
 ```
 
 1. No script `pub_extraction.py` altere a variável `url` para a url da seção do DOU da qual deseja extrair as publicações.
