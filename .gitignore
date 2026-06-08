@@ -1,2 +1,46 @@
+# ── Módulo 1: scraper/ ────────────────────────────────────────
+scraper/pubs_extracted/
+scraper/*.log
 eval/
-pubs_extracted/
+
+# ── Módulo 2: text_extraction/ ───────────────────────────────
+text_extraction/out/
+text_extraction/data/
+data/pdf/
+
+# ── Módulo 3: semantic_seg/ ───────────────────────────────────
+semantic_seg/data/
+semantic_seg/resultados/
+semantic_seg/out/
+
+# ── Ambiente e credenciais ────────────────────────────────────
+.env
+*.env
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+
+# ── Ferramentas / editores ───────────────────────────────────
+# Claude Code: settings locais e worktrees (não versionar)
+.claude/
+
+# LibreOffice / Excel lock files
+.~lock.*#
+
+# ── Sistema ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

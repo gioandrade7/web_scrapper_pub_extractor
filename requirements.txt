@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────
+# Pipeline de Extração Semântica de Documentos Jurídicos
+# Dependências unificadas dos três módulos
+# ─────────────────────────────────────────────────────────────
+
+# ── Módulo 1: scraper/ ────────────────────────────────────────
+# Scraping do Diário Oficial da União
+selenium>=4.20.0
+httpx[http2]>=0.27.0
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+requests>=2.31.0
+
+# ── Módulo 2: text_extraction/ ───────────────────────────────
+# Conversão PDF → Markdown e RTF → Texto
+marker-pdf>=0.3.0          # Conversão local PDF → Markdown
+pymupdf>=1.24.0            # Manipulação de PDFs em memória (fitz)
+openai>=1.30.0             # API OpenAI (GPT-4o para correção de Markdown)
+python-dotenv>=1.0.0       # Carregamento de variáveis de ambiente
+striprtf>=0.0.26           # Conversão RTF → Texto
+
+# ── Módulo 3: semantic_seg/ ───────────────────────────────────
+# Segmentação semântica via LLM
+# openai e python-dotenv já listados acima
+
+# ── Drivers ──────────────────────────────────────────────────
+# ChromeDriver deve ser instalado separadamente e compatível
+# com a versão do Chrome instalada no sistema.
+# Opção automatizada: pip install webdriver-manager
+# webdriver-manager>=4.0.0

@@ -1,0 +1,90 @@
+tipo_documento: "Diário Oficial da União (DOU)"
+
+descricao_geral: >
+  O Diário Oficial da União é o veículo oficial de publicação dos atos
+  normativos, administrativos e decisórios do Governo Federal brasileiro,
+  gerido pela Imprensa Nacional. O DOU confere publicidade e vigência aos
+  atos da Administração Pública Federal, sendo obrigatória a sua publicação
+  para que produzam efeitos jurídicos perante terceiros. Seus documentos
+  abrangem desde leis e medidas provisórias até portarias ministeriais,
+  sentenças publicadas por determinação legal, pareceres vinculantes e
+  comunicados institucionais.
+
+definicao_bloco: |
+  Um bloco corresponde a **um único ato normativo, decisório ou
+  institucional**, tal como é publicado de forma individual no DOU. Cada
+  ato possui um **identificador próprio** (tipo do ato + número + data, ou
+  tipo do ato + data quando aplicável) e termina, em geral, na assinatura
+  ou cláusula de promulgação do signatário daquele ato específico,
+  imediatamente antes do próximo identificador.
+
+  Exemplos de identificadores válidos:
+    - "## LEI Nº 14.123, DE 30 DE JUNHO DE 2021"
+    - "## DECRETO Nº 10.500, DE 28 DE SETEMBRO DE 2021"
+    - "## MEDIDA PROVISÓRIA Nº 1.087, DE 15 DE DEZEMBRO DE 2021"
+    - "## INSTRUÇÃO NORMATIVA Nº 90, DE 28 DE SETEMBRO DE 2021"
+    - "## PORTARIA MS Nº 2.715, DE 30 DE SETEMBRO DE 2021"
+    - "## PARECER Nº 17/2021"
+    - "NOTA TÉCNICA Nº 5/2021/DIR/AGU"
+
+  O bloco termina, em geral, na assinatura/promulgação do signatário
+  daquele ato, OU no início do próximo identificador, o que vier primeiro.
+
+regras_granularidade: |
+  1. **Atos com identificadores completos distintos** (tipo + número + data)
+     são SEMPRE blocos distintos, mesmo quando compartilham cabeçalho de
+     seção, preâmbulo, mesmo assunto ou mesmo signatário.
+
+  2. **Não agrupe por assunto.** Cinco decretos sobre o mesmo tema = cinco
+     blocos, não um. O critério de unicidade é o IDENTIFICADOR.
+
+  3. **Listas com cabeçalho/preâmbulo compartilhado** (caso especial):
+     - Se cada item da lista tem identificador próprio completo (tipo +
+       número + data + corpo + assinatura próprios) → cada item é um
+       bloco independente.
+     - Se os itens da lista têm apenas número de ordem (ex.: "Nº X — ...",
+       "Art. X — ...") dependendo de um cabeçalho/preâmbulo compartilhado
+       para fazerem sentido, os itens individuais perderiam contexto
+       essencial se extraídos isoladamente. Nesse caso, trate a **LISTA
+       INTEIRA** (cabeçalho + preâmbulo + todos os itens + assinatura
+       final) como **UM ÚNICO bloco**.
+
+  4. **Retificações, errata e republicações** com identificador próprio
+     são blocos separados, mesmo que referenciem outro ato.
+
+  5. **Anexos, tabelas e listas internas DENTRO de um mesmo ato** (sem
+     novo identificador) fazem parte desse mesmo bloco.
+
+segmentos:
+  - nome: "Atos Normativos Primários"
+    descricao: >
+      Documentos que criam direito novo de forma originária, extraindo
+      sua validade diretamente da Constituição. Incluem leis complementares,
+      leis ordinárias, medidas provisórias, decretos legislativos e
+      resoluções do Congresso. Caracterizam-se por inovar na ordem jurídica,
+      estabelecendo direitos, obrigações ou procedimentos inexistentes
+      anteriormente.
+
+  - nome: "Atos Normativos Secundários"
+    descricao: >
+      Documentos que regulamentam e detalham a aplicação de leis já
+      existentes, sem criar direito novo. Abrangem decretos regulamentares,
+      portarias, instruções normativas e resoluções administrativas. Sua
+      função é operacionalizar os comandos legais primários, especificando
+      procedimentos e diretrizes para execução.
+
+  - nome: "Atos Decisórios e Jurisdicionais"
+    descricao: >
+      Documentos resultantes do exercício da função judicante ou de
+      competências decisórias, como sentenças, acórdãos, decisões
+      monocráticas, despachos judiciais e pareceres vinculantes. Aplicam
+      o direito a casos concretos, resolvendo litígios ou definindo
+      interpretações obrigatórias.
+
+  - nome: "Manifestações Institucionais"
+    descricao: >
+      Documentos que expressam posicionamentos oficiais de órgãos públicos
+      sem caráter normativo ou decisório direto. Incluem pareceres técnicos,
+      notas técnicas, recomendações, declarações e comunicados
+      institucionais. Orientam condutas e consolidam entendimentos
+      técnico-jurídicos.
