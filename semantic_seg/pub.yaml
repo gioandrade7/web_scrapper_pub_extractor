@@ -31,26 +31,78 @@ definicao_bloco: |
   daquele ato, OU no início do próximo identificador, o que vier primeiro.
 
 regras_granularidade: |
-  1. **Atos com identificadores completos distintos** (tipo + número + data)
-     são SEMPRE blocos distintos, mesmo quando compartilham cabeçalho de
-     seção, preâmbulo, mesmo assunto ou mesmo signatário.
+  ATENÇÃO — ORDEM DE PRECEDÊNCIA: avalie a regra 0 (séries/lotes de atos
+  homogêneos) ANTES de aplicar a regra "um identificador = um bloco".
+  Documentos do DOU frequentemente publicam, como UMA ÚNICA matéria,
+  conjuntos inteiros de atos curtos e repetitivos — e o padrão-ouro trata
+  esses conjuntos como UM bloco só, mesmo que cada item interno carregue
+  seu próprio número/data. Tratar cada item desses conjuntos como um bloco
+  independente é o principal motivo de SOBRE-SEGMENTAÇÃO: um único bloco
+  de referência acaba sendo fatiado em dezenas de fragmentos.
 
-  2. **Não agrupe por assunto.** Cinco decretos sobre o mesmo tema = cinco
-     blocos, não um. O critério de unicidade é o IDENTIFICADOR.
+  0. **Séries/lotes de atos curtos e homogêneos = UM ÚNICO bloco.**
+     Reconheça este padrão e agrupe TUDO (cabeçalho coletivo, se houver, +
+     todos os itens + assinaturas) em um só bloco quando observar VÁRIOS
+     dos sinais abaixo em sequência, sem um novo título de seção/matéria
+     entre os itens:
+       a. **Cabeçalho coletivo no plural** anunciando um conjunto, ex.:
+          "DECISÕES — Ação Direta ...", "DESPACHOS DO PRESIDENTE
+          DA REPÚBLICA", "EXTRATOS DE...", "ATOS DE...";
+       b. **Mesma autoridade/órgão signatário** em todos os itens (mesmo
+          quando o nome do signatário só aparece ao final de cada item);
+       c. **Mesma base legal/fundamentação repetida quase que literalmente**
+          em cada item (mesma portaria de consolidação, mesmo artigo de
+          lei citado, mesmo tipo de processo);
+       d. **Estrutura e fórmulas de fechamento idênticas ou quase-idênticas**
+          se repetindo item após item (ex.: "Art. 2º Esta Portaria entra em
+          vigor na data de sua publicação." seguido sempre do mesmo nome);
+       e. **Itens curtos** (dezenas a poucas centenas de palavras cada),
+          tipicamente decisões/portarias/despachos repetitivos de rotina
+          (sanções, outorgas, extratos, decisões monocráticas em série),
+          e não atos normativos de fundo extensos e singulares.
+     Exemplos já corretamente agrupados no padrão-ouro (mantenha esse
+     comportamento): "MENSAGEM Nº 60 a Nº 70, DE 21 DE JANEIRO DE 2026"
+     (11 mensagens presidenciais sob o cabeçalho "DESPACHOS DO PRESIDENTE
+     DA REPÚBLICA"); um conjunto de ~18 "PORTARIA Nº 20.XXX" de sanção de
+     advertência, todas da mesma Coordenadora-Geral de Fiscalização, com
+     idêntica fundamentação e fórmula de encerramento; um bloco "DECISÕES"
+     do STF reunindo ~15-30 ADIs/ADPFs/ADCs sob o mesmo cabeçalho da Lei
+     nº 9.868/1999. Em todos esses casos, o identificador do bloco é o
+     CABEÇALHO COLETIVO ou um intervalo (ex.: "PORTARIA Nº 20.857 a Nº
+     20.927, DE 31 DE DEZEMBRO DE 2025"), não o número de cada item.
+     Quando em dúvida entre agrupar ou separar um conjunto de itens curtos
+     e repetitivos da mesma origem, **prefira agrupar**.
 
-  3. **Listas com cabeçalho/preâmbulo compartilhado** (caso especial):
-     - Se cada item da lista tem identificador próprio completo (tipo +
-       número + data + corpo + assinatura próprios) → cada item é um
-       bloco independente.
+  1. **Fora do padrão de série/lote acima**, atos com identificadores
+     completos distintos (tipo + número + data) e CONTEÚDO SUBSTANTIVO
+     PRÓPRIO (ementa, fundamentação e dispositivo individuais, não apenas
+     repetição de fórmula) são blocos distintos — mesmo quando compartilham
+     cabeçalho de seção, preâmbulo, assunto ou signatário. Isso vale
+     tipicamente para atos normativos de fundo (leis, decretos, medidas
+     provisórias, portarias substantivas, resoluções) publicados de forma
+     individualizada, um por matéria.
+
+  2. **Não agrupe por assunto** quando os atos NÃO formam uma série/lote no
+     sentido da regra 0. Cinco decretos de fundo sobre o mesmo tema,
+     publicados como matérias distintas = cinco blocos, não um. Fora do
+     padrão de série, o critério de unicidade é o IDENTIFICADOR.
+
+  3. **Listas com cabeçalho/preâmbulo compartilhado** (caso especial,
+     complementar à regra 0):
      - Se os itens da lista têm apenas número de ordem (ex.: "Nº X — ...",
        "Art. X — ...") dependendo de um cabeçalho/preâmbulo compartilhado
        para fazerem sentido, os itens individuais perderiam contexto
-       essencial se extraídos isoladamente. Nesse caso, trate a **LISTA
-       INTEIRA** (cabeçalho + preâmbulo + todos os itens + assinatura
-       final) como **UM ÚNICO bloco**.
+       essencial se extraídos isoladamente. Trate a **LISTA INTEIRA**
+       (cabeçalho + preâmbulo + todos os itens + assinatura final) como
+       **UM ÚNICO bloco**.
+     - Se cada item tem identificador completo e conteúdo substantivo
+       próprio (não é uma série curta e repetitiva — ver regra 0) → cada
+       item é um bloco independente.
 
-  4. **Retificações, errata e republicações** com identificador próprio
-     são blocos separados, mesmo que referenciem outro ato.
+  4. **Retificações, errata e republicações** com identificador próprio e
+     conteúdo substantivo individual são blocos separados, mesmo que
+     referenciem outro ato — salvo se também fizerem parte de uma série/
+     lote nos termos da regra 0.
 
   5. **Anexos, tabelas e listas internas DENTRO de um mesmo ato** (sem
      novo identificador) fazem parte desse mesmo bloco.
@@ -58,33 +110,38 @@ regras_granularidade: |
 segmentos:
   - nome: "Atos Normativos Primários"
     descricao: >
-      Documentos que criam direito novo de forma originária, extraindo
-      sua validade diretamente da Constituição. Incluem leis complementares,
-      leis ordinárias, medidas provisórias, decretos legislativos e
-      resoluções do Congresso. Caracterizam-se por inovar na ordem jurídica,
-      estabelecendo direitos, obrigações ou procedimentos inexistentes
-      anteriormente.
+      Atos que inovam diretamente na ordem jurídica e retiram sua força
+      diretamente da Constituição Federal. Exemplos no DOU: leis (ordinárias,
+      complementares, delegadas), medidas provisórias, decretos presidenciais
+      e emendas à Constituição. Foco: criar direitos, deveres, proibições e
+      estruturar a administração pública de forma geral e abstrata.
 
   - nome: "Atos Normativos Secundários"
     descricao: >
-      Documentos que regulamentam e detalham a aplicação de leis já
-      existentes, sem criar direito novo. Abrangem decretos regulamentares,
-      portarias, instruções normativas e resoluções administrativas. Sua
-      função é operacionalizar os comandos legais primários, especificando
-      procedimentos e diretrizes para execução.
+      Atos emitidos por ministérios, agências reguladoras e autarquias para
+      detalhar, explicar ou aplicar as leis — não podem criar direitos novos
+      que a lei não previu. Exemplos no DOU: instruções normativas (INs),
+      resoluções da diretoria colegiada (como as da Anvisa), portarias
+      normativas e deliberações de conselhos federais. Foco: estabelecer
+      regras técnicas, procedimentos e padrões para setores específicos da
+      sociedade ou da economia.
 
-  - nome: "Atos Decisórios e Jurisdicionais"
+  - nome: "Atos Administrativos Decisórios de Efeitos Concretos"
     descricao: >
-      Documentos resultantes do exercício da função judicante ou de
-      competências decisórias, como sentenças, acórdãos, decisões
-      monocráticas, despachos judiciais e pareceres vinculantes. Aplicam
-      o direito a casos concretos, resolvendo litígios ou definindo
-      interpretações obrigatórias.
+      Decisões finais da administração pública que aplicam a lei a uma pessoa
+      ou empresa específica, gerando efeitos práticos imediatos (individuais e
+      determinados). Exemplos no DOU: atos de alfandegamento da Receita
+      Federal, concessões e autorizações da Anatel, indeferimentos de
+      registros de marcas ou cosméticos e homologações de contratos. Foco:
+      deferir, indeferir, conceder ou extinguir direitos individuais após a
+      análise de um processo administrativo.
 
-  - nome: "Manifestações Institucionais"
+  - nome: "Atos de Gestão de Pessoal de Caráter Geral e Atos de Expediente"
     descricao: >
-      Documentos que expressam posicionamentos oficiais de órgãos públicos
-      sem caráter normativo ou decisório direto. Incluem pareceres técnicos,
-      notas técnicas, recomendações, declarações e comunicados
-      institucionais. Orientam condutas e consolidam entendimentos
-      técnico-jurídicos.
+      Atos que regulam a vida funcional dos servidores públicos de forma macro
+      ou que dão publicidade a decisões administrativas internas obrigatórias
+      por lei. Exemplos no DOU: editais de concursos públicos federais,
+      homologações de resultados de concursos, diretrizes gerais de pessoal e
+      extratos de decisões coletivas de RH. Foco: organizar a força de
+      trabalho do Estado e dar transparência a atos que afetam o interesse
+      público geral.
