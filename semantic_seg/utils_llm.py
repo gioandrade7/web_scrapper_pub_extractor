@@ -64,6 +64,7 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
         Retorne **exclusivamente** um objeto JSON válido, sem texto adicional, com as seguintes chaves:
 
         - `"classificacao"` : string — nome exato de uma das categorias listadas acima
+        - `"norma_alvo"`   : string | null — identificador da norma sobre a qual este bloco age (ex.: "Lei nº 9.394/1996", "Portaria MEC nº 45/2024"), **COPIADO LITERALMENTE** do texto. `null` se a classificação for `"autônomo"` ou se nenhuma norma-alvo for identificável.
         - `"offset_inicio"` : string — trecho inicial (primeiras ~80 chars) do bloco, **COPIADO LITERALMENTE** do texto acima
         - `"offset_fim"`    : string — trecho final (últimas ~80 chars) do bloco, **COPIADO LITERALMENTE** do texto acima
         - `"pagina_inicio"` : inteiro — número da página onde o bloco começa (conforme os marcadores <!-- PÁGINA N -->)
@@ -77,6 +78,7 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
         - **Bloco completo**: não corte no meio de uma frase, cláusula ou identificador.
         - **Bloco mínimo, porém autossuficiente**: em caso de dúvida entre um bloco grande agrupando elementos correlatos vs. um bloco menor contendo apenas o primeiro elemento, prefira o menor — **desde que** o trecho menor seja autossuficiente (não dependa de cabeçalho, preâmbulo ou contexto que ficou fora dele para fazer sentido). Se o trecho menor perderia contexto essencial ao ser extraído isoladamente, inclua o contexto necessário no bloco.
         - Se o texto não contiver nenhum bloco semântico identificável, retorne `"classificacao": null` e todos os valores como `null` ou `0`.
+        - Para `"norma_alvo"`: copie literalmente o identificador da norma como aparece no texto (com número e ano). Se o bloco age sobre várias normas, cite a principal. Se for `"autônomo"`, retorne `null`.
         """
 
 
