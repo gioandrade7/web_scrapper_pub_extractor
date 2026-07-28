@@ -101,12 +101,22 @@ def metricas_texto(pred: str, ref: str) -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def carregar_referencias_dou(dir_anot: Path) -> tuple[dict, dict]:
-    """Formato DOU: arquivos Pub_NN.txt. Sem informação de classe."""
+    """Formato DOU: arquivos Pub_NN.txt. Lê classes.json se disponível."""
     refs = {
         p.name: p.read_text(encoding="utf-8")
         for p in sorted(dir_anot.glob("Pub_*.txt"))
     }
-    return refs, {}
+    classes: dict = {}
+    classes_file = dir_anot / "classes.json"
+    if classes_file.exists():
+        import json as _json
+        raw = _json.loads(classes_file.read_text(encoding="utf-8"))
+        classes = {
+            nome: info["classe"]
+            for nome, info in raw.items()
+            if info.get("classe")
+        }
+    return refs, classes
 
 
 _PATTERN_LEI = re.compile(r'^\d{5}-(.+)-\d{5}-\d{5}\.txt$')
@@ -222,12 +232,15 @@ def matching_greedy(blocos, referencias, threshold):
 # Avaliação de classificação (apenas formato lei)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def avaliar_classificacao(tp_pares, fps, fns, classes_ref):
+def avaliar_classificacao(tp_pares, classes_ref):
     """Enriquece tp_pares com info de classificação e calcula métricas por classe.
 
-    Para cada TP, compara classificacao predita com classe anotada.
-    FP de classificação = bloco detectado mas com classe errada.
-    FN de classificação = referência não detectada OU detectada com classe errada.
+    A classificação é avaliada **exclusivamente sobre os TPs de detecção**
+    (blocos corretamente segmentados). FPs e FNs de segmentação NÃO entram
+    aqui — são um problema de detecção, não de classificação. Assim, cada
+    bloco corretamente detectado é uma amostra do problema multiclasse:
+        FP_cls = detectado, mas rótulo errado (contado na classe predita)
+        FN_cls = detectado, mas rótulo errado (contado na classe verdadeira)
     """
     for par in tp_pares:
         true_cls = classes_ref.get(par["referencia"], "")
@@ -238,16 +251,14 @@ def avaliar_classificacao(tp_pares, fps, fns, classes_ref):
     tp_cls = Counter(
         p["classe_referencia"] for p in tp_pares if p["classificacao_correta"]
     )
-    # FP_cls por classe predita: detectado mas classe errada + blocos sem match
+    # FP_cls por classe predita: detectado mas classe errada
     fp_cls = Counter()
     for p in tp_pares:
         if not p["classificacao_correta"]:
             fp_cls[p["classificacao"]] += 1
-    for b in fps:
-        fp_cls[b["classificacao"]] += 1
 
-    # FN_cls: referência não detectada + detectada com classe errada
-    fn_cls = Counter(classes_ref[r] for r in fns if r in classes_ref)
+    # FN_cls por classe verdadeira: detectado mas classe errada
+    fn_cls = Counter()
     for p in tp_pares:
         if not p["classificacao_correta"]:
             fn_cls[p["classe_referencia"]] += 1
@@ -371,12 +382,12 @@ def main():
         print(f"  Matches exatos                : {exatos}/{TP}")
     print(SEP)
 
-    # ── Classificação (apenas formato lei) ────────────────────────────────────
+    # ── Classificação (lei ou dou com classes.json) ───────────────────────────
     por_classe = {}
     acc_info   = {}
-    if args.formato == "lei" and tp_pares:
+    if classes_ref and tp_pares:
         por_classe, accuracy, corretos, total_tps = avaliar_classificacao(
-            tp_pares, fps, fns, classes_ref
+            tp_pares, classes_ref
         )
 
         print(f"\n{SEP}")

@@ -12,11 +12,11 @@ definicao_bloco: |
   Um bloco corresponde a **uma unidade estrutural hierárquica da lei**
   conforme a Lei Complementar nº 95/1998 (Redação das Leis). Cada bloco
   é identificado por sua categoria estrutural (epígrafe, ementa, preâmbulo,
-  artigo, parágrafo, inciso, alínea, item, capítulo, título, seção,
+  caput de artigo, parágrafo, inciso, alínea, item, capítulo, título, seção,
   subseção, livro, parte) e possui um **marcador estrutural próprio**.
 
   Exemplos de marcadores estruturais:
-    - "Art. 1º", "Art. 2º" (artigo)
+    - "Art. 1º", "Art. 2º" (caput de artigo — vide regra 2 sobre subelementos)
     - "§ 1º", "§ 2º", "Parágrafo único" (parágrafo)
     - "I –", "II –", "III –" (inciso, em algarismos romanos)
     - "a)", "b)", "c)" (alínea)
@@ -30,16 +30,20 @@ definicao_bloco: |
   hierárquico superior.
 
 regras_granularidade: |
-  1. **Cada unidade estrutural enumerada** (artigo, parágrafo, inciso,
-     alínea, item, capítulo, título, seção, etc.) deve ser identificada
-     como um bloco próprio com sua classificação correspondente.
+  1. **Cada unidade estrutural enumerada** (caput de artigo, parágrafo,
+     inciso, alínea, item, capítulo, título, seção, etc.) deve ser
+     identificada como um bloco próprio com sua classificação
+     correspondente.
 
-  2. **Hierarquia de "art" vs subelementos**: quando classificar um trecho
-     como `art`, o bloco engloba o caput E TODOS os subelementos
-     subordinados (parágrafos, incisos, alíneas e itens daquele artigo).
-     Use as classificações `cpt`, `par`, `inc`, `ali` ou `item` apenas
-     quando o trecho corresponder exclusivamente àquela subdivisão
-     isolada, sem incluir o resto do artigo.
+  2. **Artigos não geram um bloco "art" englobando o artigo inteiro**:
+     o marcador "Art. Nº" sempre dá início a um bloco `cpt` (caput),
+     nunca a um bloco que englobe o artigo inteiro com seus
+     subelementos. O bloco `cpt` cobre o texto introdutório do artigo —
+     do marcador "Art. Nº" até o início do primeiro subelemento
+     subordinado (parágrafo, inciso, alínea ou item) ou, se o artigo não
+     tiver subelementos, até o final do artigo. Cada subelemento
+     subordinado (`par`, `inc`, `ali`, `item`, `pena`, `alt`) é um bloco
+     independente adicional, separado do `cpt`.
 
   3. **Cabeçalhos hierárquicos** (`cap`, `tit`, `sec`, `subsec`, `liv`,
      `prt`) são blocos próprios que contêm APENAS o marcador e o título
@@ -76,19 +80,16 @@ segmentos:
       na forma "O PRESIDENTE DA REPÚBLICA, usando da atribuição que lhe confere
       o art. X da Constituição, decreta:".
 
-  - nome: "art"
-    descricao: >
-      Artigo como bloco completo, englobando o caput e todos os seus
-      subelementos (parágrafos, incisos, alíneas e itens). É a unidade normativa
-      fundamental da lei, identificada por "Art. Nº". Use esta classe quando o
-      trecho corresponder ao artigo inteiro, não apenas à sua sentença de
-      abertura.
-
   - nome: "cpt"
     descricao: >
-      Caput do artigo: exclusivamente a sentença de abertura que segue o
-      marcador "Art. Nº", sem incluir parágrafos, incisos ou alíneas
-      subordinados. Enuncia a regra principal do artigo.
+      Caput do artigo: bloco SEMPRE presente para cada "Art. Nº", mesmo
+      quando o artigo não possui parágrafos, incisos, alíneas ou itens —
+      nesse caso o `cpt` corresponde a todo o texto do artigo. Quando há
+      subelementos, o `cpt` cobre apenas o texto introdutório, do marcador
+      "Art. Nº" até o início do primeiro subelemento subordinado. Não existe
+      bloco que englobe o artigo inteiro com seus subelementos: use sempre
+      `cpt` + um bloco separado para cada subelemento (`par`, `inc`, `ali`,
+      `item`, `pena`, `alt`).
       Exemplo: "Art. 1º  São estabelecidas as diretrizes orçamentárias da
       União para 2015, compreendendo:".
 
