@@ -71,15 +71,18 @@ def montar_texto_completo(paginas: list[dict]) -> str:
     ]
     return "\n\n".join(partes)
 
-def _montar_janela(texto_completo: str, mapa: list[tuple[int, int]], 
+def _montar_janela(texto_completo: str, posicoes: list[int],
                    idx_pag_atual: int, pos_atual: int, pos_fim_jan: int) -> str:
     """
     Fatia o texto de pos_atual até pos_fim_jan.
     Se pos_atual estiver no meio de uma página (não coincide com o início
     do marcador), injeta o marcador dessa página no topo da janela para
     que o LLM saiba sempre em qual página está lendo.
+
+    `posicoes[idx]` é a posição de caractere do marcador da página `idx + 1`.
     """
-    pag_num, pag_pos = mapa[idx_pag_atual]
+    pag_num = idx_pag_atual + 1
+    pag_pos = posicoes[idx_pag_atual]
     janela = texto_completo[pos_atual:pos_fim_jan]
 
     # pos_atual está no meio da página → o marcador ficou para trás

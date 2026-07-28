@@ -1,9 +1,9 @@
 import json
 import os
-import unicodedata
 from dotenv import load_dotenv
 from openai import OpenAI
 from utils_files import montar_texto_completo, _montar_janela
+from anchor import avancar_por_offset, extrair_trecho
 
 load_dotenv()
 
@@ -81,7 +81,7 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Helpers internos
+# Chamada ao LLM
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> dict:
@@ -92,9 +92,6 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
     prompt = construir_prompt(config, janela_texto)
 
     if verboso:
-        # print("\n── Prompt gerado ──────────────────────────────────────")
-        # resumo = prompt[:3000] + "\n[...]\n" if len(prompt) > 3000 else prompt
-        # print(resumo)
         print("── Chamando o LLM... ──────────────────────────────────\n")
 
     response = client.chat.completions.create(
@@ -125,181 +122,34 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
     return json.loads(raw)
 
 
-def _construir_mapa_paginas(texto_completo: str, paginas: list[dict]) -> list[tuple[int, int]]:
-    """
-    Mapeia cada página ao seu índice de início no texto_completo.
-
-    Retorna
-    -------
-    Lista de (pagina_num_1indexed, char_pos_inicio) ordenada por posição.
-    """
-    mapa = []
-    for p in paginas:
-        marcador = f"<!-- PÁGINA {p['pagina']} -->"
-        idx = texto_completo.find(marcador)
-        if idx != -1:
-            mapa.append((p["pagina"], idx))
-    # Garante ordenação por posição no texto
-    mapa.sort(key=lambda x: x[1])
-    return mapa
-
-
-def _pos_fim_janela(mapa: list[tuple[int, int]], idx_pagina_fim: int, len_total: int) -> int:
-    """Retorna a posição de caractere que representa o fim da janela."""
-    if idx_pagina_fim < len(mapa):
-        return mapa[idx_pagina_fim][1]
-    return len_total
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Matching tolerante de âncoras
+# Mapa de páginas
+#
+# `carregar_paginas` numera as páginas sequencialmente (1..N), então a página
+# de número K está SEMPRE no índice K-1. Basta, portanto, guardar a posição de
+# caractere do marcador de cada página numa lista simples: `posicoes[idx]` é o
+# início da página `idx + 1`. (Antes isto era uma lista de tuplas
+# (num_pagina, posicao), o que forçava conversões constantes entre índice
+# 0-based e número de página 1-based.)
 # ──────────────────────────────────────────────────────────────────────────────
 
-_MARKDOWN_CHARS = frozenset("_*#`~>")
+def _mapear_paginas(texto_completo: str, total_paginas: int) -> list[int]:
+    """Posição de caractere do marcador `<!-- PÁGINA K -->` de cada página."""
+    return [
+        texto_completo.find(f"<!-- PÁGINA {pagina} -->")
+        for pagina in range(1, total_paginas + 1)
+    ]
 
 
-def _normalizar(texto: str) -> tuple[str, list[int]]:
-    """
-    Normaliza `texto` para matching tolerante.
-
-    Aplica, na ordem:
-    1. Remove marcadores markdown inline (`_ * # ` ~ >`).
-    2. Colapsa qualquer sequência de whitespace em um único espaço.
-    3. Decompõe acentos (NFD) e descarta caracteres combinantes.
-    4. Converte para minúsculas.
-
-    Retorna (normalizado, mapa) onde `mapa[i]` é a posição em `texto`
-    original do char `normalizado[i]`. Permite recuperar offsets do
-    texto original a partir de um match feito no espaço normalizado.
-    """
-    chars: list[str] = []
-    mapa: list[int] = []
-    prev_space = True  # evita espaço inicial
-
-    for i, ch in enumerate(texto):
-        if ch in _MARKDOWN_CHARS:
-            continue
-        if ch.isspace():
-            if not prev_space:
-                chars.append(" ")
-                mapa.append(i)
-                prev_space = True
-            continue
-        decomp = unicodedata.normalize("NFD", ch)
-        base = "".join(c for c in decomp if unicodedata.category(c) != "Mn")
-        for c in base.lower():
-            chars.append(c)
-            mapa.append(i)
-        prev_space = False
-
-    return "".join(chars), mapa
+def _pos_de_idx(posicoes: list[int], idx: int, len_texto: int) -> int:
+    """Posição de início da página no índice `idx`, ou o fim do texto se `idx` estourar."""
+    return posicoes[idx] if idx < len(posicoes) else len_texto
 
 
-_norm_cache_texto: str | None = None
-_norm_cache_resultado: tuple[str, list[int]] | None = None
-
-
-def _normalizar_texto_cached(texto: str) -> tuple[str, list[int]]:
-    """Cache de identidade para a normalização do texto completo (reusado em toda iteração)."""
-    global _norm_cache_texto, _norm_cache_resultado
-    if _norm_cache_texto is not texto:
-        _norm_cache_texto = texto
-        _norm_cache_resultado = _normalizar(texto)
-    return _norm_cache_resultado  # type: ignore[return-value]
-
-
-def _localizar_ancora(
-    texto: str,
-    ancora: str,
-    pos_busca: int = 0,
-) -> tuple[int, int]:
-    """
-    Localiza `ancora` em `texto` a partir de `pos_busca` com matching em camadas.
-
-    Estratégia
-    ----------
-    1. `find()` exato sobre a âncora completa.
-    2. `find()` exato sobre os primeiros 80 chars (caso o LLM tenha truncado).
-    3. `find()` em versão normalizada (markdown removido, whitespace colapsado,
-       acentos removidos, lowercase) — mapeia a posição encontrada de volta
-       para o texto original.
-    4. Mesmo passo 3 mas com a âncora normalizada truncada a 80 chars.
-
-    Retorna `(pos_inicio, pos_fim)` no texto original, com `pos_fim` exclusivo
-    (posição imediatamente após o último char da âncora). `(-1, -1)` se nenhuma
-    camada encontrar.
-    """
-    if not ancora:
-        return -1, -1
-
-    # Camada 1: exato
-    idx = texto.find(ancora, pos_busca)
-    if idx != -1:
-        return idx, idx + len(ancora)
-
-    # Camada 2: exato sobre primeiros 80 chars
-    parcial = ancora[:80].strip()
-    if parcial and parcial != ancora:
-        idx = texto.find(parcial, pos_busca)
-        if idx != -1:
-            return idx, idx + len(parcial)
-
-    # Camadas 3–4: matching normalizado
-    norm_texto, mapa = _normalizar_texto_cached(texto)
-    norm_ancora, _ = _normalizar(ancora)
-    if not norm_ancora:
-        return -1, -1
-
-    # Traduz pos_busca para o espaço normalizado (primeiro índice cuja
-    # posição original >= pos_busca).
-    norm_pos_busca = len(mapa)
-    for i, p in enumerate(mapa):
-        if p >= pos_busca:
-            norm_pos_busca = i
-            break
-
-    def _match_em_normalizado(alvo: str) -> tuple[int, int]:
-        idx_n = norm_texto.find(alvo, norm_pos_busca)
-        if idx_n == -1:
-            return -1, -1
-        pos_ini = mapa[idx_n]
-        pos_fim = mapa[idx_n + len(alvo) - 1] + 1
-        return pos_ini, pos_fim
-
-    pos_ini, pos_fim = _match_em_normalizado(norm_ancora)
-    if pos_ini != -1:
-        return pos_ini, pos_fim
-
-    norm_parcial = norm_ancora[:80].strip()
-    if norm_parcial and norm_parcial != norm_ancora:
-        return _match_em_normalizado(norm_parcial)
-
-    return -1, -1
-
-
-def _avançar_por_offset(
-    texto_completo: str,
-    offset_fim: str,
-    pos_atual: int,
-) -> int:
-    """
-    Localiza offset_fim no texto a partir de pos_atual e retorna a posição
-    imediatamente após o fim do trecho. -1 se não encontrar.
-
-    Delega para `_localizar_ancora`, que aplica matching tolerante
-    (markdown, whitespace, acentos, case).
-    """
-    _, pos_fim = _localizar_ancora(texto_completo, offset_fim, pos_atual)
-    return pos_fim
-
-
-def _idx_pagina_de_pos(mapa: list[tuple[int, int]], pos: int) -> int:
-    """
-    Retorna o índice (0-based) na lista mapa correspondente à página
-    que contém a posição de caractere `pos`.
-    """
+def _idx_pagina_de_pos(posicoes: list[int], pos: int) -> int:
+    """Índice (0-based) da página que contém a posição de caractere `pos`."""
     resultado = 0
-    for i, (_, ppos) in enumerate(mapa):
+    for i, ppos in enumerate(posicoes):
         if ppos <= pos:
             resultado = i
         else:
@@ -307,38 +157,51 @@ def _idx_pagina_de_pos(mapa: list[tuple[int, int]], pos: int) -> int:
     return resultado
 
 
-def _num_pagina_de_idx(mapa: list[tuple[int, int]], idx: int) -> int:
-    """Retorna o número de página (1-indexed) dado o índice no mapa."""
-    if idx < len(mapa):
-        return mapa[idx][0]
-    return mapa[-1][0] if mapa else 0
-
-
-def _extrair_trecho(
+def _avancar_apos_bloco(
     texto_completo: str,
-    offset_inicio: str,
-    offset_fim: str,
-    pos_busca_inicio: int = 0,
-) -> str | None:
+    resultado: dict,
+    posicoes: list[int],
+    pos_antes_do_bloco: int,
+    total_paginas: int,
+    len_texto: int,
+) -> tuple[int, int]:
     """
-    Extrai o trecho completo do bloco usando offset_inicio e offset_fim
-    como âncoras. Usa matching tolerante via `_localizar_ancora`.
+    Determina a nova posição do ponteiro após um bloco identificado.
 
-    Retorna o slice `texto_completo[pos_ini:pos_fim]` (inclui o próprio
-    offset_fim), ou None se qualquer âncora não for encontrada.
+    Cascata de fallback (do mais preciso ao mais grosseiro):
+      1. Logo após `offset_fim` (caso normal).
+      2. Logo após `offset_inicio` — progresso mínimo dentro da mesma página,
+         evitando pular blocos curtos que seguem o bloco identificado.
+      3. Início da página seguinte a `pagina_fim` — último recurso quando
+         nenhuma âncora é localizada.
+
+    Retorna `(pos_atual, idx_pag_atual)`.
     """
-    if not offset_inicio or not offset_fim:
-        return None
+    # Fallback 0 (normal): após offset_fim
+    nova_pos = avancar_por_offset(texto_completo, resultado.get("offset_fim", ""), pos_antes_do_bloco)
+    if nova_pos != -1:
+        return nova_pos, _idx_pagina_de_pos(posicoes, nova_pos)
 
-    pos_ini, _ = _localizar_ancora(texto_completo, offset_inicio, pos_busca_inicio)
-    if pos_ini == -1:
-        return None
+    # Fallback 1: após offset_inicio
+    pos_apos_inicio = avancar_por_offset(
+        texto_completo, resultado.get("offset_inicio", ""), pos_antes_do_bloco
+    )
+    if pos_apos_inicio != -1:
+        print("  ⚠  offset_fim não localizado. Avançando para após offset_inicio.")
+        return pos_apos_inicio, _idx_pagina_de_pos(posicoes, pos_apos_inicio)
 
-    _, pos_fim = _localizar_ancora(texto_completo, offset_fim, pos_ini)
-    if pos_fim == -1:
-        return None
-
-    return texto_completo[pos_ini:pos_fim]
+    # Fallback 2: página seguinte a pagina_fim.
+    # Página K está no índice K-1, logo a página seguinte a `pagina_fim` está
+    # no índice `pagina_fim`.
+    pag_fim_resultado = resultado.get("pagina_fim", 0)
+    print(
+        f"  ⚠  offset_fim e offset_inicio não localizados. "
+        f"Avançando até após a pág. {pag_fim_resultado}."
+    )
+    idx_apos_bloco = pag_fim_resultado
+    if 0 < idx_apos_bloco < total_paginas:
+        return posicoes[idx_apos_bloco], idx_apos_bloco
+    return len_texto, total_paginas
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -372,27 +235,15 @@ def processar_documento_completo(
        última página da janela atual, o bloco pode estar incompleto. Nesse
        caso, a janela é estendida automaticamente até o dobro do tamanho
        original antes de uma nova tentativa.
-
-    Parâmetros
-    ----------
-    config         : dict de configuração (tipo_documento, descricao_geral, segmentos)
-    paginas        : lista de dicts retornada por carregar_paginas()
-    model          : modelo OpenAI a utilizar
-    verboso        : se True, imprime prompts e progresso detalhado
-    janela_paginas : número de páginas por janela de contexto
-
-    Retorna
-    -------
-    Lista de dicts, um por bloco identificado.
     """
-    texto_completo  = montar_texto_completo(paginas)
-    mapa            = _construir_mapa_paginas(texto_completo, paginas)
-    total_paginas   = len(paginas)
-    len_texto       = len(texto_completo)
+    texto_completo = montar_texto_completo(paginas)
+    total_paginas  = len(paginas)
+    posicoes       = _mapear_paginas(texto_completo, total_paginas)
+    len_texto      = len(texto_completo)
 
     blocos        = []
     pos_atual     = 0       # ponteiro de char no texto_completo
-    idx_pag_atual = 0       # índice 0-based no mapa de páginas
+    idx_pag_atual = 0       # índice 0-based da página atual (página = idx + 1)
     iteracao      = 0
     MAX_ITER      = total_paginas * 15  # teto de segurança anti-loop infinito
 
@@ -407,18 +258,17 @@ def processar_documento_completo(
 
         # ── Define os limites da janela atual ─────────────────────────────
         idx_pag_fim  = min(idx_pag_atual + janela_paginas, total_paginas)
-        pos_fim_jan  = _pos_fim_janela(mapa, idx_pag_fim, len_texto)
-        # janela_texto = texto_completo[pos_atual:pos_fim_jan]
-        janela_texto = _montar_janela(texto_completo, mapa, idx_pag_atual, pos_atual, pos_fim_jan)
-        
+        pos_fim_jan  = _pos_de_idx(posicoes, idx_pag_fim, len_texto)
+        janela_texto = _montar_janela(texto_completo, posicoes, idx_pag_atual, pos_atual, pos_fim_jan)
+
         if not janela_texto.strip():
             print("  ⚠  Janela vazia — fim do documento alcançado.")
             break
 
-        pag_ini_str = _num_pagina_de_idx(mapa, idx_pag_atual)
-        pag_fim_str = _num_pagina_de_idx(mapa, idx_pag_fim - 1)
+        # Página K está no índice K-1: a janela cobre as páginas
+        # (idx_pag_atual + 1) até idx_pag_fim.
         print(
-            f"── Iteração {iteracao:>3} │ págs. {pag_ini_str}–{pag_fim_str} "
+            f"── Iteração {iteracao:>3} │ págs. {idx_pag_atual + 1}–{idx_pag_fim} "
             f"│ {len(janela_texto):>8,} chars ──"
         )
 
@@ -428,101 +278,56 @@ def processar_documento_completo(
 
         # ── Bloco não encontrado — avança 1 página e continua ────────────
         if not resultado.get("classificacao"):
-            print(f"  ⚠  Nenhum bloco identificado. Avançando 1 página...")
+            print("  ⚠  Nenhum bloco identificado. Avançando 1 página...")
             idx_pag_atual = min(idx_pag_atual + 1, total_paginas)
-            pos_atual = mapa[idx_pag_atual][1] if idx_pag_atual < total_paginas else len_texto
+            pos_atual = _pos_de_idx(posicoes, idx_pag_atual, len_texto)
             continue
 
         # ── Verificação de truncamento ─────────────────────────────────────
-        # Se pagina_fim bate com a última página da janela, o bloco pode
-        # ter sido cortado. Expande a janela e tenta de novo.
-        pag_fim_resultado  = resultado.get("pagina_fim", 0)
-        pag_fim_janela_num = _num_pagina_de_idx(mapa, idx_pag_fim - 1)
-
-        if pag_fim_resultado >= pag_fim_janela_num and idx_pag_fim < total_paginas:
+        # A última página da janela tem número `idx_pag_fim` (página = índice+1).
+        # Se pagina_fim bate com ela, o bloco pode ter sido cortado: expande a
+        # janela e tenta de novo.
+        if resultado.get("pagina_fim", 0) >= idx_pag_fim and idx_pag_fim < total_paginas:
             janela_expandida = min(janela_paginas * 2, total_paginas - idx_pag_atual)
             print(
-                f"  ⚠  Bloco pode estar truncado (pagina_fim={pag_fim_resultado} "
+                f"  ⚠  Bloco pode estar truncado (pagina_fim={resultado.get('pagina_fim')} "
                 f"= última pág. da janela). Expandindo para {janela_expandida} págs..."
             )
             idx_pag_fim_exp  = min(idx_pag_atual + janela_expandida, total_paginas)
-            pos_fim_jan_exp  = _pos_fim_janela(mapa, idx_pag_fim_exp, len_texto)
-            janela_texto_exp = texto_completo[pos_atual:pos_fim_jan_exp]
-
-            resultado = _chamar_llm(config, janela_texto_exp, model, verboso)
+            pos_fim_jan_exp  = _pos_de_idx(posicoes, idx_pag_fim_exp, len_texto)
+            resultado = _chamar_llm(config, texto_completo[pos_atual:pos_fim_jan_exp], model, verboso)
 
             if not resultado.get("classificacao"):
                 print("  ⚠  Ainda sem bloco após expansão. Avançando meia janela.")
                 idx_pag_atual = min(idx_pag_atual + max(1, janela_paginas // 2), total_paginas)
-                pos_atual     = mapa[idx_pag_atual][1] if idx_pag_atual < total_paginas else len_texto
+                pos_atual     = _pos_de_idx(posicoes, idx_pag_atual, len_texto)
                 continue
 
-        # ── Avança posição via offset_fim ─────────────────────────────────
+        # ── Avança posição para depois do bloco ───────────────────────────
         pos_antes_do_bloco = pos_atual
-        offset_fim = resultado.get("offset_fim", "")
-        nova_pos   = _avançar_por_offset(texto_completo, offset_fim, pos_atual)
-
-        if nova_pos == -1:
-            # Fallback 1: avança para logo após offset_inicio — progresso
-            # mínimo que mantém o pipeline dentro da mesma página, evitando
-            # pular blocos curtos que seguem o bloco identificado.
-            offset_inicio = resultado.get("offset_inicio", "")
-            pos_apos_inicio = _avançar_por_offset(
-                texto_completo, offset_inicio, pos_antes_do_bloco
-            )
-            if pos_apos_inicio != -1:
-                print(
-                    f"  ⚠  offset_fim não localizado. "
-                    f"Avançando para após offset_inicio."
-                )
-                pos_atual     = pos_apos_inicio
-                idx_pag_atual = _idx_pagina_de_pos(mapa, pos_atual)
-            else:
-                # Fallback 2: ambas as âncoras falharam — avança para a
-                # página seguinte ao pagina_fim como último recurso.
-                print(
-                    f"  ⚠  offset_fim e offset_inicio não localizados. "
-                    f"Avançando até após a pág. {pag_fim_resultado}."
-                )
-                idx_apos_bloco = None
-                for i, (pnum, _) in enumerate(mapa):
-                    if pnum == pag_fim_resultado:
-                        idx_apos_bloco = i + 1
-                        break
-
-                if idx_apos_bloco is not None and idx_apos_bloco < total_paginas:
-                    idx_pag_atual = idx_apos_bloco
-                    pos_atual     = mapa[idx_pag_atual][1]
-                else:
-                    idx_pag_atual = total_paginas
-                    pos_atual     = len_texto
-        else:
-            pos_atual     = nova_pos
-            idx_pag_atual = _idx_pagina_de_pos(mapa, pos_atual)
+        pos_atual, idx_pag_atual = _avancar_apos_bloco(
+            texto_completo, resultado, posicoes, pos_antes_do_bloco,
+            total_paginas, len_texto,
+        )
 
         # ── Extrai o trecho completo do documento original ────────────────
         # pos_busca_inicio aponta para antes do início da janela atual,
         # evitando que o match recaia sobre uma ocorrência anterior idêntica.
-        trecho = _extrair_trecho(
+        resultado["texto"] = extrair_trecho(
             texto_completo,
             resultado.get("offset_inicio", ""),
             resultado.get("offset_fim", ""),
             pos_busca_inicio=pos_antes_do_bloco,
         )
-        resultado["texto"] = trecho  # None se as âncoras não forem encontradas
 
         # ── Registra o bloco ───────────────────────────────────────────────
         blocos.append(resultado)
 
-        titulo  = resultado.get("titulo", "N/A")
-        classif = resultado.get("classificacao", "?")
-        p_ini   = resultado.get("pagina_inicio", "?")
-        p_fim   = resultado.get("pagina_fim", "?")
-        pct     = pos_atual / len_texto * 100
-
+        pct = pos_atual / len_texto * 100
         print(
-            f"  ✓ Bloco {len(blocos):>3}: [{classif}] {titulo}\n"
-            f"           págs. {p_ini}–{p_fim} │ "
+            f"  ✓ Bloco {len(blocos):>3}: [{resultado.get('classificacao', '?')}] "
+            f"{resultado.get('titulo', 'N/A')}\n"
+            f"           págs. {resultado.get('pagina_inicio', '?')}–{resultado.get('pagina_fim', '?')} │ "
             f"nova pos = char {pos_atual:,} ({pct:.1f}% do doc)"
         )
 
@@ -531,73 +336,3 @@ def processar_documento_completo(
     print(f"{SEP}\n")
 
     return blocos
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Compatibilidade retroativa — identifica apenas o primeiro bloco
-# ──────────────────────────────────────────────────────────────────────────────
-
-def identificar_primeiro_bloco(
-    config: dict,
-    paginas: list[dict],
-    model: str = "gpt-4o",
-    verboso: bool = True,
-) -> dict:
-    """
-    Identifica apenas o primeiro bloco semântico do documento.
-    Mantido para compatibilidade retroativa.
-    """
-    texto_completo = montar_texto_completo(paginas)
-    return _chamar_llm(config, texto_completo, model, verboso)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Exibição
-# ──────────────────────────────────────────────────────────────────────────────
-
-def exibir_resultado(resultado: dict) -> None:
-    """Exibe um único bloco no terminal."""
-    print("── Resultado ──────────────────────────────────────────")
-    if not resultado.get("classificacao"):
-        print("  Nenhum bloco semântico identificado no texto.")
-        return
-
-    pagina_inicio = resultado.get("pagina_inicio", "?")
-    pagina_fim    = resultado.get("pagina_fim", "?")
-    paginas_str   = (
-        f"pág. {pagina_inicio}"
-        if pagina_inicio == pagina_fim
-        else f"págs. {pagina_inicio}–{pagina_fim}"
-    )
-
-    print(f"  Classificação  : {resultado['classificacao']}")
-    print(f"  Título         : {resultado.get('titulo', 'N/A')}")
-    print(f"  Páginas        : {paginas_str}")
-    print(f"  Offset início  : {resultado['offset_inicio']}")
-    print(f"  Offset fim     : {resultado['offset_fim']}")
-    print(f"  Motivo         : {resultado.get('motivo', '')}")
-    texto = resultado.get("texto")
-    if texto:
-        preview = texto[:300].replace("\n", "↵ ")
-        reticencias = "..." if len(texto) > 300 else ""
-        print(f"  Texto ({len(texto):,} chars): {preview}{reticencias}")
-    else:
-        print(f"  Texto          : ⚠ não extraído (âncoras não localizadas)")
-    print(f"  {'─' * 50}")
-
-
-def exibir_resumo_blocos(blocos: list[dict]) -> None:
-    """Exibe um resumo tabular de todos os blocos identificados."""
-    SEP = "─" * 70
-    print(f"\n{SEP}")
-    print(f"  {'#':>3}  {'Págs.':^12}  {'Classificação':<25}  Título")
-    print(SEP)
-    for i, b in enumerate(blocos, 1):
-        p_ini   = b.get("pagina_inicio", "?")
-        p_fim   = b.get("pagina_fim", "?")
-        paginas = f"{p_ini}–{p_fim}" if p_ini != p_fim else str(p_ini)
-        classif = (b.get("classificacao") or "")[:25]
-        titulo  = (b.get("titulo") or "N/A")[:35]
-        print(f"  {i:>3}  {paginas:^12}  {classif:<25}  {titulo}")
-    print(SEP)
-    print(f"  Total: {len(blocos)} bloco(s)\n")

@@ -1,7 +1,8 @@
 import json
 import argparse
-from utils_llm import processar_documento_completo, exibir_resultado, exibir_resumo_blocos
+from utils_llm import processar_documento_completo
 from utils_files import carregar_config, carregar_paginas
+from display import exibir_resultado, exibir_resumo_blocos
 
 
 
@@ -19,30 +20,11 @@ def main():
     parser.add_argument("--model",         default="gpt-5.4-2026-03-05",     help="Modelo OpenAI a utilizar.")
     parser.add_argument("--janela-paginas",default=10, type=int, help="Número de páginas por janela de contexto (padrão: 20).")
     parser.add_argument("--so-resultado",  action="store_true",  help="Exibe apenas os resultados, sem prompts.")
-    parser.add_argument(
-        "--min-itens-lista",
-        default=4,
-        type=int,
-        help=(
-            "Número mínimo de cabeçalhos do mesmo tipo em sequência para marcar "
-            "um trecho como lista na pré-detecção (padrão: 4)."
-        ),
-    )
-    parser.add_argument(
-        "--sem-pre-deteccao",
-        action="store_true",
-        help="Desativa a pré-detecção de listas antes da chamada do LLM.",
-    )
     args = parser.parse_args()
 
     # ── Carregamento ──────────────────────────────────────────────────────────
     config  = carregar_config(args.config)
     paginas = carregar_paginas(args.diretorio, extensao=args.extensao)
-
-    # ── Pré-detecção de listas ────────────────────────────────────────────────
-    # Marca trechos com várias linhas começando pelo mesmo padrão de cabeçalho
-    # (ex.: várias "ACÓRDÃO Nº ..." em sequência) para dar contexto explícito
-    # ao LLM e mitigar o colapso de listas em um único bloco semântico.
 
     # ── Pipeline de janela deslizante ─────────────────────────────────────────
     blocos = processar_documento_completo(
