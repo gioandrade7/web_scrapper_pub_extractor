@@ -111,18 +111,14 @@ segmentos:
   - nome: "Atos Normativos Primários"
     descricao: >
       Atos que inovam diretamente na ordem jurídica e retiram sua força
-      diretamente da Constituição Federal. Exemplos no DOU: leis (ordinárias,
-      complementares, delegadas), medidas provisórias, decretos presidenciais
-      e emendas à Constituição. Foco: criar direitos, deveres, proibições e
+      diretamente da Constituição Federal. Foco: criar direitos, deveres, proibições e
       estruturar a administração pública de forma geral e abstrata.
 
   - nome: "Atos Normativos Secundários"
     descricao: >
       Atos emitidos por ministérios, agências reguladoras e autarquias para
       detalhar, explicar ou aplicar as leis — não podem criar direitos novos
-      que a lei não previu. Exemplos no DOU: instruções normativas (INs),
-      resoluções da diretoria colegiada (como as da Anvisa), portarias
-      normativas e deliberações de conselhos federais. Foco: estabelecer
+      que a lei não previu. Foco: estabelecer
       regras técnicas, procedimentos e padrões para setores específicos da
       sociedade ou da economia.
 
@@ -130,9 +126,7 @@ segmentos:
     descricao: >
       Decisões finais da administração pública que aplicam a lei a uma pessoa
       ou empresa específica, gerando efeitos práticos imediatos (individuais e
-      determinados). Exemplos no DOU: atos de alfandegamento da Receita
-      Federal, concessões e autorizações da Anatel, indeferimentos de
-      registros de marcas ou cosméticos e homologações de contratos. Foco:
+      determinados). Foco:
       deferir, indeferir, conceder ou extinguir direitos individuais após a
       análise de um processo administrativo.
 
@@ -140,16 +134,10 @@ segmentos:
     descricao: >
       Atos que regulam a vida funcional dos servidores públicos de forma macro
       ou que dão publicidade a decisões administrativas internas obrigatórias
-      por lei. Exemplos no DOU: editais de concursos públicos federais,
-      homologações de resultados de concursos, diretrizes gerais de pessoal e
-      extratos de decisões coletivas de RH. Foco: organizar a força de
+      por lei. Foco: organizar a força de
       trabalho do Estado e dar transparência a atos que afetam o interesse
       público geral.
 
   - nome: "Outros"
     descricao: >
       Publicações que não se enquadram em nenhuma das categorias acima.
-      Exemplos: comunicados institucionais sem força normativa, avisos,
-      editais de licitação, extratos de contratos, retificações de publicações
-      anteriores, notas técnicas sem caráter decisório e demais atos
-      residuais do DOU.
