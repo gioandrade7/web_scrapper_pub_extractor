@@ -1,0 +1,42 @@
+segmentos:
+  - nome: "Descrição do Artefato"
+    descricao: >
+      Caracteriza o artefato criado pelos autores — estrutura, formato,
+      features, categorias/tipologias, componentes do dataset, sistema ou
+      modelo proposto. Foco: o "o quê" do artefato em si, não como ele foi
+      produzido nem como foi avaliado.
+
+  - nome: "Processo Gerador"
+    descricao: >
+      Descreve como o artefato foi produzido — método, algoritmo,
+      arquitetura de simulação/geração, passos operacionais, pipeline de
+      construção. Foco: o "como" da criação do artefato, do princípio ao
+      resultado bruto, antes de qualquer avaliação.
+
+  - nome: "Protocolo de Avaliação"
+    descricao: >
+      Descreve o desenho experimental usado para avaliar o artefato —
+      métricas adotadas, modelos/baselines empregados, divisão de dados,
+      configuração dos experimentos. Foco: o setup da avaliação, não os
+      valores de resultado em si nem a comparação com terceiros.
+
+  - nome: "Benchmark Comparativo"
+    descricao: >
+      Posiciona o artefato frente a alternativas existentes, com
+      comparação explícita — quantitativa (números, tabelas de métricas)
+      ou qualitativa (o que outras soluções têm ou não têm) — a outros
+      datasets, métodos ou sistemas similares. Foco: comparação direta,
+      não apenas menção de trabalho relacionado sem contraste.
+
+  - nome: "Disponibilidade e Reprodutibilidade"
+    descricao: >
+      Trata do acesso ao artefato — onde obtê-lo, licenciamento,
+      código-fonte, requisitos e limitações para reprodução do trabalho.
+
+  - nome: "Outros"
+    descricao: >
+      Trechos que não descrevem o artefato, seu processo de criação, sua
+      avaliação, comparação ou disponibilidade. Inclui metadados (título,
+      autores, afiliações, resumo, palavras-chave), motivação geral do
+      problema sem foco no artefato, conclusão geral, referências
+      bibliográficas e elementos editoriais/estruturais do documento.

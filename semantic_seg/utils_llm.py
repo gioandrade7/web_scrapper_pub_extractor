@@ -17,33 +17,28 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
     Monta o prompt completo que será enviado ao LLM.
 
     O prompt em si é **genérico** para qualquer tipo de bloco semântico.
-    Especificidades do tipo de documento (o que define um bloco, regras
-    de granularidade, exemplos de identificadores) ficam no arquivo de
-    configuração (YAML), nos campos `definicao_bloco` e
-    `regras_granularidade`, e são inseridas dinamicamente abaixo.
+    Especificidades do tipo de documento (o que define um bloco e onde ele
+    começa/termina) ficam inteiramente no campo `regras_granularidade` do
+    arquivo de configuração (YAML), inserido dinamicamente abaixo.
     """
     segmentos_formatados = "\n\n".join(
         f"{i+1}. **{s['nome']}**\n   {s['descricao']}"
         for i, s in enumerate(config["segmentos"])
     )
 
-    definicao_bloco = (config.get("definicao_bloco") or
-                       "Uma unidade textual coesa, com início e fim claramente delimitados, "
-                       "que trata de um único assunto/ato dentro do tipo de documento analisado.").strip()
-
-    regras_granularidade = (config.get("regras_granularidade") or "").strip()
-    bloco_granularidade = (
-        f"\n\n        ## Regras de granularidade (específicas deste tipo de documento)\n        {regras_granularidade}"
-        if regras_granularidade else ""
-    )
+    regras_granularidade = (config.get("regras_granularidade") or
+                            "Uma unidade textual coesa, com início e fim claramente delimitados, "
+                            "que trata de um único assunto/ato dentro do tipo de documento analisado.").strip()
 
     return f"""Você é um especialista em análise de documentos oficiais brasileiros, com profundo conhecimento do {config["tipo_documento"]}.
 
         ## Descrição do tipo de documento
         {config["descricao_geral"]}
 
-        ## Definição de bloco semântico (específica deste tipo de documento)
-        {definicao_bloco}{bloco_granularidade}
+        ## Definição de bloco e regras de granularidade
+        Um bloco semântico é uma unidade textual coesa, com início e fim claramente delimitados, classificável em uma única categoria entre as listadas abaixo. As regras a seguir definem precisamente onde cada bloco começa e termina neste tipo de documento — siga-as como critério principal de segmentação.
+
+        {regras_granularidade}
 
         ## Categorias de classificação disponíveis
         As categorias abaixo representam os tipos de blocos semânticos que podem aparecer neste documento:
@@ -94,9 +89,12 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
     if verboso:
         print("── Chamando o LLM... ──────────────────────────────────\n")
 
+    kwargs = {}
+    if not model.startswith("gpt-5"):
+        kwargs["temperature"] = 0
+
     response = client.chat.completions.create(
         model=model,
-        temperature=0,
         response_format={"type": "json_object"},
         messages=[
             {
@@ -108,6 +106,7 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
             },
             {"role": "user", "content": prompt},
         ],
+        **kwargs,
     )
 
     raw = response.choices[0].message.content.strip()

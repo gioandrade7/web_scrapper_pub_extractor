@@ -8,7 +8,7 @@ descricao_geral: >
   temáticas: direito civil, penal, administrativo, tributário, trabalhista e
   setorial.
 
-definicao_bloco: |
+regras_granularidade: |
   Um bloco corresponde a **uma unidade estrutural hierárquica da lei**
   conforme a Lei Complementar nº 95/1998 (Redação das Leis). Cada bloco
   é identificado por sua categoria estrutural (epígrafe, ementa, preâmbulo,
@@ -29,7 +29,6 @@ definicao_bloco: |
   O bloco termina antes do próximo marcador de mesmo nível ou de nível
   hierárquico superior.
 
-regras_granularidade: |
   1. **Cada unidade estrutural enumerada** (caput de artigo, parágrafo,
      inciso, alínea, item, capítulo, título, seção, etc.) deve ser
      identificada como um bloco próprio com sua classificação

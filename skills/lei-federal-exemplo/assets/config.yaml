@@ -1,0 +1,69 @@
+tipo_documento: Lei federal
+descricao_geral: Segmente textos de leis federais brasileiras promulgadas e publicadas em formato legislativo. Esses documentos normalmente contêm epígrafe, ementa, preâmbulo, divisões hierárquicas do articulado (parte, livro, título, capítulo, seção, subseção), artigos com caput e subelementos (parágrafos, incisos, alíneas, itens), e podem incluir dispositivos de alteração legislativa com transcrição literal de redação nova ou acrescida, inclusive tipos penais com cláusulas de pena.
+regras_granularidade: 'Considere como bloco mínimo cada ocorrência completa de uma classe listada. Separe sempre epígrafe, ementa e preâmbulo em blocos próprios. Em cabeçalhos estruturais, una número e título da mesma divisão em um único bloco da classe correspondente, mesmo quando vierem em linhas separadas (ex.: "CAPÍTULO I" + "DISPOSIÇÕES PRELIMINARES"). Para cada artigo, extraia obrigatoriamente um bloco `cpt`: se não houver subelementos, o `cpt` é todo o artigo; se houver, o `cpt` vai de "Art. ..." até antes do primeiro `par`, `inc`, `pena` ou `alt` subordinado. Depois, separe cada `par`, `inc`, `ali`, `item` e `pena` como bloco próprio, sem fundir irmãos nem incorporar texto de níveis inferiores. Trate como `alt` qualquer trecho de outro diploma reproduzido literalmente dentro de aspas ou introduzido por fórmula de alteração (nova redação, acréscimo, revogação), inclusive quando o trecho transcrito contenha artigos, parágrafos, incisos, alíneas, itens ou pena: nesse caso, capture o
+  trecho reproduzido como um único bloco `alt`, não decomponha seu interior nas demais classes. Ignore fechos protocolares e assinaturas finais que não pertençam a nenhuma classe.'
+segmentos:
+- nome: epigrafe
+  descricao: 'Identificação formal da lei: tipo do ato ("LEI Nº"), número sequencial e data de promulgação. Aparece no topo do documento, em caixa-alta e negrito. Exemplo: "LEI Nº 13.080, DE 2 DE JANEIRO DE 2015".
+
+    '
+- nome: ementa
+  descricao: 'Síntese do objeto da lei, redigida em itálico logo abaixo da epígrafe. Resume a matéria regulada e serve como indexador temático. Exemplo: "Dispõe sobre as diretrizes para a elaboração e execução da Lei Orçamentária de 2015 e dá outras providências."
+
+    '
+- nome: preambulo
+  descricao: 'Fórmula de promulgação que precede o articulado. Nas leis federais inclui a cláusula "A PRESIDENTA DA REPÚBLICA Faço saber que o Congresso Nacional decreta e eu sanciono a seguinte Lei:". Em leis mais antigas pode aparecer na forma "O PRESIDENTE DA REPÚBLICA, usando da atribuição que lhe confere o art. X da Constituição, decreta:".
+
+    '
+- nome: cpt
+  descricao: 'Caput do artigo: bloco SEMPRE presente para cada "Art. Nº", mesmo quando o artigo não possui parágrafos, incisos, alíneas ou itens — nesse caso o `cpt` corresponde a todo o texto do artigo. Quando há subelementos, o `cpt` cobre apenas o texto introdutório, do marcador "Art. Nº" até o início do primeiro subelemento subordinado. Não existe bloco que englobe o artigo inteiro com seus subelementos: use sempre `cpt` + um bloco separado para cada subelemento (`par`, `inc`, `ali`, `item`, `pena`, `alt`). Exemplo: "Art. 1º  São estabelecidas as diretrizes orçamentárias da União para 2015, compreendendo:".
+
+    '
+- nome: par
+  descricao: 'Parágrafo do artigo, introduzido por "§ Nº" ou pela expressão "Parágrafo único". Estabelece exceções, condições, definições ou complementações ao caput. Pode conter incisos e alíneas próprios.
+
+    '
+- nome: inc
+  descricao: 'Inciso: subdivisão enumerada em algarismos romanos (ex.: "I –", "II –"), subordinada ao caput ou a um parágrafo. Apresenta hipóteses alternativas, cumulativas ou itens de uma enumeração.
+
+    '
+- nome: ali
+  descricao: 'Alínea: subdivisão do inciso identificada por letra minúscula seguida de parêntese (ex.: "a)", "b)"). Detalha ou qualifica as hipóteses do inciso ao qual está subordinada.
+
+    '
+- nome: item
+  descricao: 'Item: subdivisão da alínea enumerada em algarismos arábicos (ex.: "1.", "2."). Nível hierárquico mais granular do articulado, pouco frequente.
+
+    '
+- nome: alt
+  descricao: 'Alteração: trecho de outra lei reproduzido literalmente dentro do corpo de uma lei modificadora. Ocorre quando a lei em análise dá nova redação, acrescenta ou revoga dispositivos de legislação anterior, transcrevendo o texto alterado. Pode ser um artigo, parágrafo ou inciso da lei-alvo.
+
+    '
+- nome: pena
+  descricao: 'Pena: cláusula de sanção penal contida em artigos de leis penais ou com disposições criminais. Identifica-se pela expressão "Pena –" seguida da modalidade e do quantum da pena (ex.: "Pena – reclusão, de 2 (dois) a 4 (quatro) anos, e multa."). Aparece subordinada ao caput ou a um parágrafo de tipo penal.
+
+    '
+- nome: cap
+  descricao: 'Capítulo: divisão temática da lei composta por número em algarismos romanos e título (ex.: "CAPÍTULO I – DAS DISPOSIÇÕES GERAIS"). Agrupa artigos relacionados. Número e título são apresentados juntos como um único bloco de cabeçalho.
+
+    '
+- nome: tit
+  descricao: 'Título: nível hierárquico acima do capítulo, presente em leis extensas e códigos (ex.: "TÍTULO I – DOS DIREITOS E DEVERES INDIVIDUAIS"). Agrupa capítulos sob uma mesma temática ampla.
+
+    '
+- nome: sec
+  descricao: 'Seção: subdivisão do capítulo, identificada por número e título (ex.: "Seção I – Da Competência"). Agrupa artigos dentro de um capítulo quando a matéria exige partição mais fina.
+
+    '
+- nome: subsec
+  descricao: 'Subseção: nível hierárquico abaixo da seção, usado em leis de maior complexidade normativa (ex.: "Subseção I – Das Atribuições"). Agrupa artigos dentro de uma seção.
+
+    '
+- nome: liv
+  descricao: 'Livro: divisão de alto nível presente em códigos e estatutos de grande extensão (ex.: "LIVRO I – DA PARTE GERAL"). Agrupa títulos ou capítulos sob uma mesma unidade temática maior.
+
+    '
+- nome: prt
+  descricao: 'Parte: nível hierárquico mais abrangente da estrutura legal, acima do livro. Presente apenas em codificações muito extensas (ex.: "PARTE GERAL", "PARTE ESPECIAL"). Divide a lei em grandes blocos estruturais.
+
+    '

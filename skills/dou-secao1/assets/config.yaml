@@ -1,0 +1,25 @@
+tipo_documento: Diário Oficial da União - Seção 1
+descricao_geral: Trate o documento como uma edição da Seção 1 do Diário Oficial da União, que reúne atos oficiais federais de natureza legislativa, regulamentar, administrativa e informativa. Espere encontrar leis, decretos, despachos, mensagens, portarias, atos, resoluções, retificações, republicações, avisos, anexos, quadros, listas, resultados, cabeçalhos ministeriais, sumário, rodapés, assinaturas e outros trechos editoriais ou de apoio, inclusive conteúdos que podem estar intercalados, quebrados por página ou parcialmente corrompidos por OCR.
+regras_granularidade: Extraia como um bloco o menor ato semântico completo que permita classificar uma única classe. Agrupe título/epígrafe, ementa, preâmbulo, fundamento legal, dispositivo, anexos imediatos, assinaturas e fecho quando todos pertencem ao mesmo ato e à mesma classe. Separe quando começar outro ato autônomo, mesmo sob o mesmo órgão, cabeçalho coletivo ou sequência numerada (por exemplo, cada "Nº ..." com efeito próprio é um bloco distinto). Em séries sob um cabeçalho comum, mantenha o cabeçalho introdutório junto do primeiro ato da série se ele só servir de base comum; os atos seguintes formam blocos próprios sem repetir o cabeçalho. Se houver mistura ou intercalação de conteúdos de classes diferentes por quebra de página/OCR, feche o bloco no último trecho coerente do ato atual e inicie novo bloco no próximo trecho claramente atribuível a outro ato/classe. Não crie bloco para sumário, paginação, ISSN, avisos de edição, autenticação, nomes soltos, cabeçalhos hierárquicos sem
+  ato, nem outros elementos meramente editoriais; classifique esses trechos como Outros apenas quando aparecerem como conteúdo autônomo.
+segmentos:
+- nome: Atos Normativos Primários
+  descricao: 'Atos que inovam diretamente na ordem jurídica e retiram sua força diretamente da Constituição Federal. Foco: criar direitos, deveres, proibições e estruturar a administração pública de forma geral e abstrata.
+
+    '
+- nome: Atos Normativos Secundários
+  descricao: 'Atos emitidos por ministérios, agências reguladoras e autarquias para detalhar, explicar ou aplicar as leis — não podem criar direitos novos que a lei não previu. Foco: estabelecer regras técnicas, procedimentos e padrões para setores específicos da sociedade ou da economia.
+
+    '
+- nome: Atos Administrativos Decisórios de Efeitos Concretos
+  descricao: 'Decisões finais da administração pública que aplicam a lei a uma pessoa ou empresa específica, gerando efeitos práticos imediatos (individuais e determinados). Foco: deferir, indeferir, conceder ou extinguir direitos individuais após a análise de um processo administrativo.
+
+    '
+- nome: Atos de Gestão de Pessoal de Caráter Geral e Atos de Expediente
+  descricao: 'Atos que regulam a vida funcional dos servidores públicos de forma macro ou que dão publicidade a decisões administrativas internas obrigatórias por lei. Foco: organizar a força de trabalho do Estado e dar transparência a atos que afetam o interesse público geral.
+
+    '
+- nome: Outros
+  descricao: 'Publicações que não se enquadram em nenhuma das categorias acima.
+
+    '

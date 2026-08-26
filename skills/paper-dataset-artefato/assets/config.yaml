@@ -1,0 +1,38 @@
+tipo_documento: Artigo científico de conferência sobre dataset sintético
+descricao_geral: Trate o documento como um artigo científico de conferência em formato IMRAD, com título, autores, resumo, palavras-chave, introdução, trabalho relacionado, metodologia, descrição do artefato, resultados, conclusão e referências. Espere conteúdo misto entre apresentação do artefato proposto, explicação de como ele foi construído, desenho de experimentos, comparações com trabalhos ou datasets existentes, além de trechos editoriais e contextuais que não pertencem às classes centrais.
+regras_granularidade: 'Identifique como bloco a próxima unidade contínua de texto que mantém a mesma função semântica entre as classes, mesmo que atravesse subtítulos, figuras ou quebras de página. Não use seção, subseção ou parágrafo como fronteira automática: em “## III. METHODOLOGY” há trechos de processo e depois de descrição do artefato, e em “## V. RESULTS” aparecem comparação e protocolo de avaliação em partes distintas. Feche o bloco exatamente quando o foco mudar de classe.
+
+  1. Una trechos contíguos enquanto o foco semântico permanecer o mesmo, mesmo com exemplos, enumerações, tabelas ou figuras intercaladas.
+
+  2. Separe no ponto em que o texto passar de caracterizar o artefato para explicar sua construção, avaliação, comparação, disponibilidade ou conteúdo não central.
+
+  3. Dentro da mesma seção, crie blocos distintos sempre que houver mudança de classe, mesmo no meio de parágrafo ou entre parágrafos consecutivos sem novo cabeçalho.
+
+  4. Agrupe tabelas, listas e texto explicativo ao redor quando todos servirem à mesma classe, especialmente em comparações explícitas ou descrição de features/tipologias.
+
+  5. Classifique como Outros todo material de front matter, motivação geral, conclusão ampla, referências e elementos editoriais, salvo quando um trecho realmente executar outra função de classe.'
+segmentos:
+- nome: Descrição do Artefato
+  descricao: 'Caracteriza o artefato criado pelos autores — estrutura, formato, features, categorias/tipologias, componentes do dataset, sistema ou modelo proposto. Foco: o "o quê" do artefato em si, não como ele foi produzido nem como foi avaliado.
+
+    '
+- nome: Processo Gerador
+  descricao: 'Descreve como o artefato foi produzido — método, algoritmo, arquitetura de simulação/geração, passos operacionais, pipeline de construção. Foco: o "como" da criação do artefato, do princípio ao resultado bruto, antes de qualquer avaliação.
+
+    '
+- nome: Protocolo de Avaliação
+  descricao: 'Descreve o desenho experimental usado para avaliar o artefato — métricas adotadas, modelos/baselines empregados, divisão de dados, configuração dos experimentos. Foco: o setup da avaliação, não os valores de resultado em si nem a comparação com terceiros.
+
+    '
+- nome: Benchmark Comparativo
+  descricao: 'Posiciona o artefato frente a alternativas existentes, com comparação explícita — quantitativa (números, tabelas de métricas) ou qualitativa (o que outras soluções têm ou não têm) — a outros datasets, métodos ou sistemas similares. Foco: comparação direta, não apenas menção de trabalho relacionado sem contraste.
+
+    '
+- nome: Disponibilidade e Reprodutibilidade
+  descricao: 'Trata do acesso ao artefato — onde obtê-lo, licenciamento, código-fonte, requisitos e limitações para reprodução do trabalho.
+
+    '
+- nome: Outros
+  descricao: 'Trechos que não descrevem o artefato, seu processo de criação, sua avaliação, comparação ou disponibilidade. Inclui metadados (título, autores, afiliações, resumo, palavras-chave), motivação geral do problema sem foco no artefato, conclusão geral, referências bibliográficas e elementos editoriais/estruturais do documento.
+
+    '
