@@ -1,18 +1,5 @@
 import os
-import json
-import yaml
 
-def carregar_config(caminho: str) -> dict:
-    with open(caminho, "r", encoding="utf-8") as f:
-        if caminho.endswith((".yaml", ".yml")):
-            data = yaml.safe_load(f)
-            # pub.yaml e similares são JSON com extensão .yaml
-            if isinstance(data, str):
-                return json.loads(data)
-            return data
-        return json.load(f)
- 
- 
 def carregar_paginas(diretorio: str, extensao: str = ".md") -> list[dict]:
     """
     Carrega todos os arquivos de um diretório como páginas individuais.

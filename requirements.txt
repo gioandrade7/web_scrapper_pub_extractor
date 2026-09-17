@@ -15,6 +15,7 @@ requests>=2.31.0
 # Conversão PDF → Markdown e RTF → Texto
 marker-pdf>=0.3.0          # Conversão local PDF → Markdown
 pymupdf>=1.24.0            # Manipulação de PDFs em memória (fitz)
+pymupdf4llm>=0.0.17        # Engine preferencial do pdf_extract.py (Markdown com detecção de coluna/tabela)
 openai>=1.30.0             # API OpenAI (GPT-4o para correção de Markdown)
 python-dotenv>=1.0.0       # Carregamento de variáveis de ambiente
 striprtf>=0.0.26           # Conversão RTF → Texto

@@ -12,41 +12,34 @@ load_dotenv()
 # Prompt
 # ──────────────────────────────────────────────────────────────────────────────
 
-def construir_prompt(config: dict, texto_janela: str) -> str:
+def construir_prompt(texto_janela: str, insights: str = "") -> str:
     """
     Monta o prompt completo que será enviado ao LLM.
 
-    O prompt em si é **genérico** para qualquer tipo de bloco semântico.
-    Especificidades do tipo de documento (o que define um bloco e onde ele
-    começa/termina) ficam inteiramente no campo `regras_granularidade` do
-    arquivo de configuração (YAML), inserido dinamicamente abaixo.
+    O prompt é inteiramente **genérico**: não depende de nenhum arquivo de
+    configuração por tipo de documento. A tarefa do LLM é puramente de
+    **segmentação** (encontrar onde um bloco começa e termina) — não há
+    classificação em categorias pré-definidas.
+
+    `insights` são diretrizes estruturais específicas do documento, escritas
+    pelo módulo `corretor` a partir da análise dos blocos de um ciclo anterior.
+    Vazio no primeiro ciclo: o prompt parte sempre do zero e só se especializa
+    naquilo que a análise do próprio documento revelou.
     """
-    segmentos_formatados = "\n\n".join(
-        f"{i+1}. **{s['nome']}**\n   {s['descricao']}"
-        for i, s in enumerate(config["segmentos"])
-    )
+    secao_insights = f"""
+        ## Diretrizes estruturais deste documento
+        A análise dos blocos segmentados em um ciclo anterior revelou o padrão estrutural abaixo. Trate estas diretrizes como **critério prioritário** de segmentação, acima dos critérios genéricos:
 
-    regras_granularidade = (config.get("regras_granularidade") or
-                            "Uma unidade textual coesa, com início e fim claramente delimitados, "
-                            "que trata de um único assunto/ato dentro do tipo de documento analisado.").strip()
+        {insights.strip()}
+    """ if insights.strip() else ""
 
-    return f"""Você é um especialista em análise de documentos oficiais brasileiros, com profundo conhecimento do {config["tipo_documento"]}.
+    return f"""Você é um especialista em segmentação de documentos estruturados.
 
-        ## Descrição do tipo de documento
-        {config["descricao_geral"]}
-
-        ## Definição de bloco e regras de granularidade
-        Um bloco semântico é uma unidade textual coesa, com início e fim claramente delimitados, classificável em uma única categoria entre as listadas abaixo. As regras a seguir definem precisamente onde cada bloco começa e termina neste tipo de documento — siga-as como critério principal de segmentação.
-
-        {regras_granularidade}
-
-        ## Categorias de classificação disponíveis
-        As categorias abaixo representam os tipos de blocos semânticos que podem aparecer neste documento:
-
-        {segmentos_formatados}
-
+        ## Definição de bloco semântico
+        Um bloco semântico é uma unidade textual coesa, com início e fim claramente delimitados, que trata de um único assunto ou elemento estrutural do documento. Não há uma lista fixa de tipos de bloco: seu critério é a coesão e os limites naturais do texto, guiados pela própria formatação e estrutura do documento (títulos, numeração, marcadores, mudanças de assunto).
+{secao_insights}
         ## Sua tarefa
-        Analise o texto do documento fornecido abaixo e identifique **apenas o primeiro bloco semântico completo** presente no texto, conforme a definição e as regras de granularidade acima.
+        Analise o texto do documento fornecido abaixo e identifique **apenas o primeiro bloco semântico completo** presente no texto, conforme a definição acima.
 
         O texto é composto por múltiplas páginas, cada uma precedida por um marcador `<!-- PÁGINA N -->`. Um bloco semântico pode se estender por mais de uma página.
 
@@ -58,20 +51,17 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
         ## Instruções de resposta
         Retorne **exclusivamente** um objeto JSON válido, sem texto adicional, com as seguintes chaves:
 
-        - `"classificacao"` : string — nome exato de uma das categorias listadas acima
         - `"offset_inicio"` : string — trecho inicial (primeiras ~80 chars) do bloco, **COPIADO LITERALMENTE** do texto acima
         - `"offset_fim"`    : string — trecho final (últimas ~80 chars) do bloco, **COPIADO LITERALMENTE** do texto acima
         - `"pagina_inicio"` : inteiro — número da página onde o bloco começa (conforme os marcadores <!-- PÁGINA N -->)
         - `"pagina_fim"`    : inteiro — número da página onde o bloco termina (conforme os marcadores <!-- PÁGINA N -->)
         - `"titulo"`        : string — título ou identificador resumido do bloco
-        - `"motivo"`        : string — justificativa curta da classificação escolhida
+        - `"motivo"`        : string — justificativa curta de por que esse trecho forma uma unidade coesa e onde estão seus limites
 
         ## Regras importantes (genéricas)
         - **Literalidade dos offsets**: `offset_inicio` e `offset_fim` devem ser trechos **literalmente presentes** no texto acima, **copiados sem qualquer modificação** — incluindo formatação markdown (`**`, `_`, `#`, etc.), pontuação, quebras de linha e maiúsculas/minúsculas. **NUNCA parafraseie, descreva, abrevie ou explique** o bloco nos offsets; eles servem apenas para localizar o trecho no texto fonte.
         - **Unicidade dos offsets**: cada offset deve ser suficientemente longo e distintivo para localização inequívoca no texto. Em caso de itens parecidos, escolha trechos mais longos ou mais únicos.
-        - **Bloco completo**: não corte no meio de uma frase, cláusula ou identificador.
-        - **Bloco mínimo, porém autossuficiente**: em caso de dúvida entre um bloco grande agrupando elementos correlatos vs. um bloco menor contendo apenas o primeiro elemento, prefira o menor — **desde que** o trecho menor seja autossuficiente (não dependa de cabeçalho, preâmbulo ou contexto que ficou fora dele para fazer sentido). Se o trecho menor perderia contexto essencial ao ser extraído isoladamente, inclua o contexto necessário no bloco.
-        - Se o texto não contiver nenhum bloco semântico identificável, retorne `"classificacao": null` e todos os valores como `null` ou `0`.
+        - Se o texto não contiver nenhum bloco semântico identificável, retorne `"offset_inicio": null` e todos os valores como `null` ou `0`.
         """
 
 
@@ -79,15 +69,15 @@ def construir_prompt(config: dict, texto_janela: str) -> str:
 # Chamada ao LLM
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> dict:
-    """Envia uma janela de texto ao LLM e retorna o dict JSON parseado."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    client = OpenAI(api_key=api_key)
+SISTEMA_PADRAO = (
+    "Você é um assistente especializado em análise de documentos estruturados. "
+    "Responda sempre com um único objeto JSON válido, sem texto adicional."
+)
 
-    prompt = construir_prompt(config, janela_texto)
 
-    if verboso:
-        print("── Chamando o LLM... ──────────────────────────────────\n")
+def completar_json(prompt: str, model: str, sistema: str = SISTEMA_PADRAO) -> dict:
+    """Envia um prompt ao LLM e devolve o JSON parseado da resposta."""
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     kwargs = {}
     if not model.startswith("gpt-5"):
@@ -97,13 +87,7 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
         model=model,
         response_format={"type": "json_object"},
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Você é um assistente especializado em análise de documentos oficiais brasileiros. "
-                    "Responda sempre com um único objeto JSON válido, sem texto adicional."
-                ),
-            },
+            {"role": "system", "content": sistema},
             {"role": "user", "content": prompt},
         ],
         **kwargs,
@@ -119,6 +103,14 @@ def _chamar_llm(config: dict, janela_texto: str, model: str, verboso: bool) -> d
         raw = raw.strip()
 
     return json.loads(raw)
+
+
+def _chamar_llm(janela_texto: str, model: str, verboso: bool, insights: str = "") -> dict:
+    """Envia uma janela de texto ao LLM e retorna o dict JSON parseado."""
+    if verboso:
+        print("── Chamando o LLM... ──────────────────────────────────\n")
+
+    return completar_json(construir_prompt(janela_texto, insights), model)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -208,11 +200,11 @@ def _avancar_apos_bloco(
 # ──────────────────────────────────────────────────────────────────────────────
 
 def processar_documento_completo(
-    config: dict,
     paginas: list[dict],
     model: str = "gpt-4o",
     verboso: bool = True,
     janela_paginas: int = 20,
+    insights: str = "",
 ) -> list[dict]:
     """
     Percorre o documento inteiro via janela deslizante, identificando
@@ -272,11 +264,11 @@ def processar_documento_completo(
         )
 
         # ── Chama o LLM ───────────────────────────────────────────────────
-        resultado = _chamar_llm(config, janela_texto, model, verboso)
+        resultado = _chamar_llm(janela_texto, model, verboso, insights)
         print(resultado)
 
         # ── Bloco não encontrado — avança 1 página e continua ────────────
-        if not resultado.get("classificacao"):
+        if not resultado.get("offset_inicio"):
             print("  ⚠  Nenhum bloco identificado. Avançando 1 página...")
             idx_pag_atual = min(idx_pag_atual + 1, total_paginas)
             pos_atual = _pos_de_idx(posicoes, idx_pag_atual, len_texto)
@@ -294,9 +286,9 @@ def processar_documento_completo(
             )
             idx_pag_fim_exp  = min(idx_pag_atual + janela_expandida, total_paginas)
             pos_fim_jan_exp  = _pos_de_idx(posicoes, idx_pag_fim_exp, len_texto)
-            resultado = _chamar_llm(config, texto_completo[pos_atual:pos_fim_jan_exp], model, verboso)
+            resultado = _chamar_llm(texto_completo[pos_atual:pos_fim_jan_exp], model, verboso, insights)
 
-            if not resultado.get("classificacao"):
+            if not resultado.get("offset_inicio"):
                 print("  ⚠  Ainda sem bloco após expansão. Avançando meia janela.")
                 idx_pag_atual = min(idx_pag_atual + max(1, janela_paginas // 2), total_paginas)
                 pos_atual     = _pos_de_idx(posicoes, idx_pag_atual, len_texto)
@@ -324,8 +316,7 @@ def processar_documento_completo(
 
         pct = pos_atual / len_texto * 100
         print(
-            f"  ✓ Bloco {len(blocos):>3}: [{resultado.get('classificacao', '?')}] "
-            f"{resultado.get('titulo', 'N/A')}\n"
+            f"  ✓ Bloco {len(blocos):>3}: {resultado.get('titulo', 'N/A')}\n"
             f"           págs. {resultado.get('pagina_inicio', '?')}–{resultado.get('pagina_fim', '?')} │ "
             f"nova pos = char {pos_atual:,} ({pct:.1f}% do doc)"
         )

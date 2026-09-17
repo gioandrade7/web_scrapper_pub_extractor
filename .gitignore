@@ -44,3 +44,6 @@ env/
 Thumbs.db
 *.swp
 *.swo
+
+# PDFs fonte de teste (as páginas extraídas em ppb_rules_out/ são versionadas)
+text_extraction/*.pdf
