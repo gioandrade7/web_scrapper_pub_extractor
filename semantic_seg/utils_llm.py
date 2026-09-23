@@ -12,7 +12,7 @@ load_dotenv()
 # Prompt
 # ──────────────────────────────────────────────────────────────────────────────
 
-def construir_prompt(texto_janela: str, insights: str = "") -> str:
+def construir_prompt(texto_janela: str, insights: str = "", padrao: str = "") -> str:
     """
     Monta o prompt completo que será enviado ao LLM.
 
@@ -21,14 +21,21 @@ def construir_prompt(texto_janela: str, insights: str = "") -> str:
     **segmentação** (encontrar onde um bloco começa e termina) — não há
     classificação em categorias pré-definidas.
 
-    `insights` são diretrizes estruturais específicas do documento, escritas
-    pelo módulo `corretor` a partir da análise dos blocos de um ciclo anterior.
-    Vazio no primeiro ciclo: o prompt parte sempre do zero e só se especializa
-    naquilo que a análise do próprio documento revelou.
+    Duas seções opcionais o especializam, com precedências diferentes:
+
+    `padrao` é a especificação estrutural do documento, produzida pelo módulo
+    `identificador` a partir de uma amostra de páginas do **texto fonte**,
+    antes de qualquer segmentação. Diz qual é a hierarquia e em que nível
+    cortar.
+
+    `insights` são diretrizes corretivas escritas pelo módulo `corretor` a
+    partir da análise dos blocos de um ciclo anterior. Vêm de falhas
+    efetivamente observadas, então são evidência posterior: em caso de
+    conflito, prevalecem sobre o padrão.
     """
     secao_insights = f"""
-        ## Diretrizes estruturais deste documento
-        A análise dos blocos segmentados em um ciclo anterior revelou o padrão estrutural abaixo. Trate estas diretrizes como **critério prioritário** de segmentação, acima dos critérios genéricos:
+        ## Correções de ciclos anteriores
+        A auditoria dos blocos segmentados em um ciclo anterior produziu as diretrizes abaixo. Elas nascem de erros efetivamente cometidos, então têm **precedência máxima**: se contradisserem a estrutura descrita acima, siga as diretrizes.
 
         {insights.strip()}
     """ if insights.strip() else ""
@@ -37,7 +44,7 @@ def construir_prompt(texto_janela: str, insights: str = "") -> str:
 
         ## Definição de bloco semântico
         Um bloco semântico é uma unidade textual coesa, com início e fim claramente delimitados, que trata de um único assunto ou elemento estrutural do documento. Não há uma lista fixa de tipos de bloco: seu critério é a coesão e os limites naturais do texto, guiados pela própria formatação e estrutura do documento (títulos, numeração, marcadores, mudanças de assunto).
-{secao_insights}
+{padrao}{secao_insights}
         ## Sua tarefa
         Analise o texto do documento fornecido abaixo e identifique **apenas o primeiro bloco semântico completo** presente no texto, conforme a definição acima.
 
@@ -70,7 +77,7 @@ def construir_prompt(texto_janela: str, insights: str = "") -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 SISTEMA_PADRAO = (
-    "Você é um assistente especializado em análise de documentos estruturados. "
+    "Você é um assistente especializado em análise de documentos. "
     "Responda sempre com um único objeto JSON válido, sem texto adicional."
 )
 
@@ -105,12 +112,18 @@ def completar_json(prompt: str, model: str, sistema: str = SISTEMA_PADRAO) -> di
     return json.loads(raw)
 
 
-def _chamar_llm(janela_texto: str, model: str, verboso: bool, insights: str = "") -> dict:
+def _chamar_llm(
+    janela_texto: str,
+    model: str,
+    verboso: bool,
+    insights: str = "",
+    padrao: str = "",
+) -> dict:
     """Envia uma janela de texto ao LLM e retorna o dict JSON parseado."""
     if verboso:
         print("── Chamando o LLM... ──────────────────────────────────\n")
 
-    return completar_json(construir_prompt(janela_texto, insights), model)
+    return completar_json(construir_prompt(janela_texto, insights, padrao), model)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -205,6 +218,7 @@ def processar_documento_completo(
     verboso: bool = True,
     janela_paginas: int = 20,
     insights: str = "",
+    padrao: str = "",
 ) -> list[dict]:
     """
     Percorre o documento inteiro via janela deslizante, identificando
@@ -264,7 +278,7 @@ def processar_documento_completo(
         )
 
         # ── Chama o LLM ───────────────────────────────────────────────────
-        resultado = _chamar_llm(janela_texto, model, verboso, insights)
+        resultado = _chamar_llm(janela_texto, model, verboso, insights, padrao)
         print(resultado)
 
         # ── Bloco não encontrado — avança 1 página e continua ────────────
@@ -286,7 +300,9 @@ def processar_documento_completo(
             )
             idx_pag_fim_exp  = min(idx_pag_atual + janela_expandida, total_paginas)
             pos_fim_jan_exp  = _pos_de_idx(posicoes, idx_pag_fim_exp, len_texto)
-            resultado = _chamar_llm(texto_completo[pos_atual:pos_fim_jan_exp], model, verboso, insights)
+            resultado = _chamar_llm(
+                texto_completo[pos_atual:pos_fim_jan_exp], model, verboso, insights, padrao
+            )
 
             if not resultado.get("offset_inicio"):
                 print("  ⚠  Ainda sem bloco após expansão. Avançando meia janela.")

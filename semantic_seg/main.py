@@ -4,7 +4,9 @@ import argparse
 from utils_llm import processar_documento_completo
 from utils_files import carregar_paginas
 from corretor import segmentar_com_correcao
-from display import exibir_resultado, exibir_resumo_blocos, exibir_analise
+from identificador import identificar_padrao, formatar_padrao
+from display import (exibir_resultado, exibir_resumo_blocos, exibir_analise,
+                     exibir_padrao)
 
 
 
@@ -41,10 +43,28 @@ def main():
     parser.add_argument("--max-ciclos",    default=0, type=int,  help="Teto de ciclos de segmentação + correção. 0 (padrão) roda até o analisador aprovar.")
     parser.add_argument("--sem-correcao",  action="store_true",  help="Roda um único ciclo, sem o corretor.")
     parser.add_argument("--so-resultado",  action="store_true",  help="Exibe apenas os resultados, sem prompts.")
+    parser.add_argument("--paginas-amostra", default=2, type=int, help="Páginas por região (começo/meio/fim) enviadas ao identificador (padrão: 2).")
+    parser.add_argument("--sem-identificador", action="store_true", help="Não identifica o padrão do documento; o auditor volta a deduzi-lo dos próprios blocos.")
     args = parser.parse_args()
 
     # ── Carregamento ──────────────────────────────────────────────────────────
     paginas = carregar_paginas(args.diretorio, extensao=args.extensao)
+
+    # ── Identificação do padrão estrutural ────────────────────────────────────
+    # Roda uma única vez, antes de qualquer segmentação, e lê uma amostra do
+    # texto fonte — nunca os blocos. É o que impede o auditor de deduzir a
+    # estrutura da própria saída que ele julga.
+    padrao_dict: dict = {}
+    padrao = ""
+    if not args.sem_identificador:
+        padrao_dict = identificar_padrao(
+            paginas,
+            model=args.model,
+            n_amostra=args.paginas_amostra,
+            verboso=not args.so_resultado,
+        )
+        exibir_padrao(padrao_dict)
+        padrao = formatar_padrao(padrao_dict)
 
     # ── Pipeline de janela deslizante ─────────────────────────────────────────
     historico = []
@@ -54,6 +74,7 @@ def main():
             model=args.model,
             verboso=not args.so_resultado,
             janela_paginas=args.janela_paginas,
+            padrao=padrao,
         )
     else:
         blocos, historico = segmentar_com_correcao(
@@ -63,6 +84,7 @@ def main():
             janela_paginas=args.janela_paginas,
             max_ciclos=args.max_ciclos,
             exibir_analise=exibir_analise,
+            padrao=padrao,
         )
 
     # ── Exibição ──────────────────────────────────────────────────────────────
@@ -85,6 +107,14 @@ def main():
         print(f"Resultado salvo em: {caminho}")
 
         base = caminho.removesuffix(".json")
+
+        # O padrão vai para um arquivo próprio: um padrão errado contamina todos
+        # os ciclos, então precisa ficar auditável em vez de implícito.
+        if padrao_dict:
+            caminho_padrao = f"{base}_padrao.json"
+            with open(caminho_padrao, "w", encoding="utf-8") as f:
+                json.dump(padrao_dict, f, indent=2, ensure_ascii=False)
+            print(f"Padrão estrutural salvo em: {caminho_padrao}")
 
         registro = []
         for entrada in historico:

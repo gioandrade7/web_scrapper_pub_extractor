@@ -35,13 +35,54 @@ def exibir_resultado(resultado: dict) -> None:
     print(f"  {'─' * 50}")
 
 
+def exibir_padrao(padrao: dict) -> None:
+    """Exibe o padrão estrutural identificado — uma vez, antes da segmentação."""
+    SEP = "─" * 70
+    print(f"\n{SEP}")
+    print("  PADRÃO ESTRUTURAL IDENTIFICADO")
+    print(SEP)
+
+    pags  = padrao.get("paginas_amostradas") or []
+    total = padrao.get("total_paginas")
+    if pags and total:
+        print(f"  Amostra    : págs. {', '.join(map(str, pags))} de {total}")
+
+    if not padrao.get("tem_padrao"):
+        print("  Padrão     : nenhum — segmentação por mudança de assunto")
+        print(f"  Confiança  : {padrao.get('confianca', 'N/A')}")
+        print(SEP)
+        return
+
+    print(f"  Modo       : {padrao.get('modo', 'N/A')}")
+
+    hierarquia = padrao.get("hierarquia") or []
+    if hierarquia:
+        print("  Hierarquia :")
+        for h in hierarquia:
+            exemplo = h.get("exemplo")
+            sufixo  = f"  (ex.: {exemplo})" if exemplo else ""
+            print(f"    nível {h.get('nivel')} — {h.get('nome') or '?'}{sufixo}")
+
+    corte = padrao.get("nivel_de_corte")
+    nome  = next((h.get("nome") for h in hierarquia if h.get("nivel") == corte), "")
+    print(f"  Corte      : nível {corte}" + (f" ({nome})" if nome else ""))
+
+    justificativa = (padrao.get("justificativa_corte") or "").strip()
+    if justificativa:
+        print(f"  Motivo     : {justificativa}")
+
+    print(f"  Confiança  : {padrao.get('confianca', 'N/A')}")
+    print(SEP)
+
+
 def exibir_analise(analise: dict, ciclo: int) -> None:
     """Exibe o veredito do corretor sobre os blocos de um ciclo."""
     SEP = "─" * 70
     print(f"\n{SEP}")
     print(f"  ANÁLISE ESTRUTURAL — ciclo {ciclo}")
     print(SEP)
-    print(f"  Padrão identificado: {analise.get('padrao_identificado', 'N/A')}")
+    if analise.get("padrao_identificado"):
+        print(f"  Padrão identificado: {analise['padrao_identificado']}")
 
     inconsistencias = analise.get("inconsistencias") or []
     if inconsistencias:

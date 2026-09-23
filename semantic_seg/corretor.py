@@ -72,8 +72,21 @@ def resumir_blocos(blocos: list[dict]) -> str:
 # Análise
 # ──────────────────────────────────────────────────────────────────────────────
 
-def construir_prompt_analise(resumo: str, total_blocos: int, insights_atuais: str) -> str:
-    """Monta o prompt do analisador a partir do resumo dos blocos de um ciclo."""
+def construir_prompt_analise(
+    resumo: str,
+    total_blocos: int,
+    insights_atuais: str,
+    padrao: str = "",
+) -> str:
+    """
+    Monta o prompt do analisador a partir do resumo dos blocos de um ciclo.
+
+    Com `padrao` (vindo do módulo `identificador`, que leu o texto fonte), o
+    auditor **não deduz** a estrutura a partir dos blocos: ele confere a
+    segmentação contra uma especificação de fonte independente. Sem `padrao`,
+    cai no comportamento anterior — deduzir dos próprios blocos —, que é
+    circular mas mantém o pipeline funcional com `--sem-identificador`.
+    """
     secao_anterior = f"""
         ## Diretrizes usadas no ciclo anterior
         As diretrizes abaixo já estavam no prompt que produziu os blocos acima. Se não resolveram os problemas, refine-as ou substitua-as. O campo `insights` da sua resposta deve conter o conjunto **completo** de diretrizes para o próximo ciclo — não apenas o que mudou.
@@ -83,10 +96,48 @@ def construir_prompt_analise(resumo: str, total_blocos: int, insights_atuais: st
         ```
     """ if insights_atuais.strip() else ""
 
+    tem_padrao = bool(padrao.strip())
+
+    # Com padrão externo, a tarefa é conferir conformidade; sem ele, o auditor
+    # precisa deduzir a estrutura dos próprios blocos que está julgando.
+    if tem_padrao:
+        abertura = (
+            f"Um pipeline automático segmentou um documento em {total_blocos} bloco(s). "
+            "A estrutura do documento já foi identificada de forma independente e está "
+            "descrita abaixo. Sua tarefa é avaliar se os blocos a respeitam e, se não "
+            "respeitarem, escrever as diretrizes que corrigirão a próxima tentativa de "
+            "segmentação."
+        )
+        instrucao_avaliar = (
+            "A estrutura do documento **já foi identificada**, a partir de uma amostra "
+            "de páginas do texto fonte — não a partir destes blocos. **NÃO a re-deduza "
+            "dos blocos**: eles são justamente o objeto sob suspeita. Confira se a "
+            "segmentação respeita a estrutura especificada, de forma uniforme. Considere "
+            "a segmentação **inconsistente** se qualquer um destes problemas ocorrer:"
+        )
+        campo_padrao = ""
+    else:
+        abertura = (
+            f"Um pipeline automático segmentou um documento em {total_blocos} bloco(s). "
+            "Sua tarefa é avaliar se esses blocos seguem um padrão estrutural coerente "
+            "entre si e, se não seguirem, escrever as diretrizes que corrigirão a "
+            "próxima tentativa de segmentação."
+        )
+        instrucao_avaliar = (
+            "Deduza, a partir dos próprios blocos, qual é o padrão estrutural do "
+            "documento. Depois verifique se a segmentação respeita esse padrão de forma "
+            "uniforme. Considere a segmentação **inconsistente** se qualquer um destes "
+            "problemas ocorrer:"
+        )
+        campo_padrao = (
+            '\n        - `"padrao_identificado"` : string — o padrão estrutural que o '
+            "documento aparenta seguir, com os marcadores reais observados"
+        )
+
     return f"""Você é um auditor de segmentação de documentos estruturados.
 
-        Um pipeline automático segmentou um documento em {total_blocos} bloco(s) usando um prompt genérico, sem qualquer conhecimento prévio do tipo de documento. Sua tarefa é avaliar se esses blocos seguem um padrão estrutural coerente entre si e, se não seguirem, escrever as diretrizes que corrigirão a próxima tentativa de segmentação.
-
+        {abertura}
+{padrao}
         ## Blocos produzidos
         Cada bloco aparece com suas páginas, tamanho, título e os trechos iniciais e finais do texto capturado (`⏎` marca quebra de linha):
 
@@ -95,7 +146,7 @@ def construir_prompt_analise(resumo: str, total_blocos: int, insights_atuais: st
         ```
 {secao_anterior}
         ## O que avaliar
-        Deduza, a partir dos próprios blocos, qual é o padrão estrutural do documento (por exemplo: hierarquia de títulos numerados, marcadores de enumeração, unidades normativas, publicações independentes). Depois verifique se a segmentação respeita esse padrão de forma uniforme. Considere a segmentação **inconsistente** se qualquer um destes problemas ocorrer:
+        {instrucao_avaliar}
 
         1. **Granularidade desigual** — blocos em níveis hierárquicos diferentes convivendo no resultado (ex.: uma seção inteira como um bloco, enquanto subitens equivalentes de outra seção viraram blocos separados).
         2. **Bloco englobante** — um bloco desproporcionalmente extenso que agrupa várias unidades do padrão identificado, quando cada unidade deveria ser um bloco.
@@ -116,8 +167,7 @@ def construir_prompt_analise(resumo: str, total_blocos: int, insights_atuais: st
 
         ## Instruções de resposta
         Retorne **exclusivamente** um objeto JSON válido com as chaves:
-
-        - `"padrao_identificado"` : string — o padrão estrutural que o documento aparenta seguir, com os marcadores reais observados
+{campo_padrao}
         - `"inconsistencias"`     : array de strings — cada problema encontrado, citando os índices dos blocos envolvidos (ex.: "bloco [3] agrupa os subitens (a) a (w)"). Array vazio se não houver nenhum.
         - `"consistente"`         : booleano — `true` somente se nenhum dos cinco problemas acima ocorrer
         - `"insights"`            : string — as diretrizes para o próximo ciclo, em lista com marcadores. String vazia se `consistente` for `true`.
@@ -129,20 +179,27 @@ def analisar_blocos(
     model: str,
     insights_atuais: str = "",
     verboso: bool = True,
+    padrao: str = "",
 ) -> dict:
     """Submete o resumo dos blocos ao analisador e devolve seu veredito."""
     if not blocos:
-        return {
-            "padrao_identificado": "",
+        vazio = {
             "inconsistencias": ["Nenhum bloco foi produzido pela segmentação."],
             "consistente": False,
             "insights": "",
         }
+        # `padrao_identificado` só existe na resposta quando o auditor deduz a
+        # estrutura; com padrão externo, a chave não faz parte do schema.
+        if not padrao.strip():
+            vazio["padrao_identificado"] = ""
+        return vazio
 
     if verboso:
         print("── Analisando a estrutura dos blocos... ───────────────\n")
 
-    prompt = construir_prompt_analise(resumir_blocos(blocos), len(blocos), insights_atuais)
+    prompt = construir_prompt_analise(
+        resumir_blocos(blocos), len(blocos), insights_atuais, padrao
+    )
     return completar_json(prompt, model, sistema=SISTEMA_ANALISE)
 
 
@@ -157,10 +214,15 @@ def segmentar_com_correcao(
     janela_paginas: int = 20,
     max_ciclos: int = 0,
     exibir_analise=None,
+    padrao: str = "",
 ) -> tuple[list[dict], list[dict]]:
     """
     Segmenta o documento e repete o processo enquanto o analisador apontar
     inconsistências estruturais, enriquecendo o prompt a cada ciclo.
+
+    `padrao` é a especificação estrutural já pronta (ver `identificador.py`),
+    constante ao longo de todos os ciclos: o módulo roda **uma vez**, fora
+    deste laço, porque a estrutura do documento não muda entre ciclos.
 
     O loop roda até o analisador aprovar o resultado. Encerra antes disso
     apenas se ele deixar de produzir diretrizes novas ou repetir as do ciclo
@@ -189,8 +251,9 @@ def segmentar_com_correcao(
             verboso=verboso,
             janela_paginas=janela_paginas,
             insights=insights,
+            padrao=padrao,
         )
-        analise = analisar_blocos(blocos, model, insights, verboso)
+        analise = analisar_blocos(blocos, model, insights, verboso, padrao)
 
         # `blocos` guarda a extração íntegra do ciclo, não só a contagem: o
         # último ciclo não é necessariamente o melhor, e comparar as versões
