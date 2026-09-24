@@ -1,0 +1,21 @@
+{
+  "tem_padrao": true,
+  "modo": "sequencia_plana",
+  "hierarquia": [
+    {
+      "nivel": 1,
+      "nome": "seção temática",
+      "exemplo": "## **Overview and Purpose**"
+    }
+  ],
+  "nivel_de_corte": 1,
+  "justificativa_corte": "As seções marcadas literalmente por \"## **...**\" são unidades temáticas autônomas e recorrentes, cada uma reunindo parágrafos sobre um único assunto. Não há subtítulos ou numeração interna recorrente observável que justifique cortes menores.",
+  "confianca": "alta",
+  "paginas_amostradas": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "total_paginas": 4
+}

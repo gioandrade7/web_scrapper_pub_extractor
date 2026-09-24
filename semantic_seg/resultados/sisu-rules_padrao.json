@@ -1,0 +1,53 @@
+{
+  "tem_padrao": true,
+  "modo": "hierarquico",
+  "hierarquia": [
+    {
+      "nivel": 1,
+      "nome": "Portaria Normativa",
+      "exemplo": "PORTARIA NORMATIVA Nº 21, DE 5 DE NOVEMRO DE 2012"
+    },
+    {
+      "nivel": 2,
+      "nome": "Capítulo",
+      "exemplo": "CAPÍTULO III DO PROCESSO SELETIVO"
+    },
+    {
+      "nivel": 3,
+      "nome": "Seção",
+      "exemplo": "Seção II Da Inscrição dos Estudantes"
+    },
+    {
+      "nivel": 4,
+      "nome": "Artigo",
+      "exemplo": "Art. 14. O estudante deverá efetuar sua inscrição no Sisu, especificando:"
+    },
+    {
+      "nivel": 5,
+      "nome": "Parágrafo",
+      "exemplo": "§ 1º É vedada ao estudante a inscrição:"
+    },
+    {
+      "nivel": 6,
+      "nome": "Inciso",
+      "exemplo": "I - em ordem de preferência, as suas opções de vaga em instituição, local de oferta, curso, turno;"
+    },
+    {
+      "nivel": 7,
+      "nome": "Alínea",
+      "exemplo": "a) em mais de uma modalidade de concorrência para o mesmo curso e turno, na mesma instituição de ensino e local de oferta;"
+    }
+  ],
+  "nivel_de_corte": 4,
+  "justificativa_corte": "Cada \"Art.\" constitui uma regra normativa semanticamente autônoma e pode incluir seus parágrafos, incisos e alíneas necessários à sua compreensão. Capítulos e seções agregam vários artigos independentes, enquanto níveis inferiores fragmentariam a regra do artigo.",
+  "confianca": "alta",
+  "paginas_amostradas": [
+    1,
+    2,
+    5,
+    6,
+    9,
+    10
+  ],
+  "total_paginas": 10
+}

@@ -1,0 +1,48 @@
+{
+  "tem_padrao": true,
+  "modo": "hierarquico",
+  "hierarquia": [
+    {
+      "nivel": 1,
+      "nome": "Título legislativo",
+      "exemplo": "TITLE II—INVESTMENT ADVISERS"
+    },
+    {
+      "nivel": 2,
+      "nome": "Seção",
+      "exemplo": "SEC. 203A. ø 80b–3a ¿ STATE AND FEDERAL RESPONSIBILITIES."
+    },
+    {
+      "nivel": 3,
+      "nome": "Subseção",
+      "exemplo": "(a) ADVISERS SUBJECT TO STATE AUTHORITIES.—"
+    },
+    {
+      "nivel": 4,
+      "nome": "Parágrafo",
+      "exemplo": "(1) IN GENERAL.—"
+    },
+    {
+      "nivel": 5,
+      "nome": "Subparágrafo",
+      "exemplo": "(A) has assets under management of not less than $25,000,000"
+    },
+    {
+      "nivel": 6,
+      "nome": "Cláusula",
+      "exemplo": "(i) is required to be registered as an investment adviser"
+    }
+  ],
+  "nivel_de_corte": 2,
+  "justificativa_corte": "Cada unidade iniciada por \"SEC. [número].\" trata de uma matéria normativa autônoma, com título próprio e todas as suas subseções, parágrafos e subparágrafos internos. Cortar abaixo desse nível fragmentaria regras e condições que dependem da seção; cortar no título agregaria várias seções independentes.",
+  "confianca": "alta",
+  "paginas_amostradas": [
+    1,
+    2,
+    19,
+    20,
+    37,
+    38
+  ],
+  "total_paginas": 38
+}

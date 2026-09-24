@@ -1,0 +1,28 @@
+{
+  "tem_padrao": true,
+  "modo": "hierarquico",
+  "hierarquia": [
+    {
+      "nivel": 1,
+      "nome": "seção principal do artigo",
+      "exemplo": "## I. INTRODUCTION"
+    },
+    {
+      "nivel": 2,
+      "nome": "subseção",
+      "exemplo": "## _A. Comparison_"
+    }
+  ],
+  "nivel_de_corte": 1,
+  "justificativa_corte": "As seções principais numeradas em algarismos romanos, como \"## III. METHODOLOGY\", \"## V. RESULTS\" e \"## VI. CONCLUSION\", formam unidades temáticas autônomas recorrentes. As subseções com letras, como \"## _A. Comparison_\" e \"## _B. Experiment_\", aparecem apenas dentro de Results na amostra e fragmentariam seções que não possuem subdivisões equivalentes.",
+  "confianca": "alta",
+  "paginas_amostradas": [
+    1,
+    2,
+    4,
+    5,
+    7,
+    8
+  ],
+  "total_paginas": 8
+}

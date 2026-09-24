@@ -1,0 +1,48 @@
+{
+  "tem_padrao": true,
+  "modo": "hierarquico",
+  "hierarquia": [
+    {
+      "nivel": 1,
+      "nome": "Capítulo",
+      "exemplo": "CHAPTER 3 – METHODS OF SOURCE SELECTION"
+    },
+    {
+      "nivel": 2,
+      "nome": "Seção",
+      "exemplo": "Section 3-02 COMPETITIVE SEALED BIDDING."
+    },
+    {
+      "nivel": 3,
+      "nome": "Subseção alfabética",
+      "exemplo": "(d) “Special Case”."
+    },
+    {
+      "nivel": 4,
+      "nome": "Item numerado",
+      "exemplo": "(1) “Special Case” Circumstances."
+    },
+    {
+      "nivel": 5,
+      "nome": "Subitem em algarismo romano",
+      "exemplo": "(i) specifications cannot be made sufficiently definite and certain to permit selection based on bid price or evaluated bid price alone;"
+    },
+    {
+      "nivel": 6,
+      "nome": "Subitem em letra maiúscula",
+      "exemplo": "(A) five or more bids have been received in response to the original solicitation;"
+    }
+  ],
+  "nivel_de_corte": 3,
+  "justificativa_corte": "As subseções alfabéticas, como \"(i) Amendments to IFBs.\" e \"(v) Resolicitation in Cases of Failed Bids Due to Defects in the Solicitation Documents.\", constituem unidades normativas temáticas autônomas. Os níveis numerados e romanos detalham regras, requisitos ou procedimentos internos dessas unidades e não devem ser separados como blocos principais.",
+  "confianca": "alta",
+  "paginas_amostradas": [
+    1,
+    2,
+    8,
+    9,
+    16,
+    17
+  ],
+  "total_paginas": 17
+}
