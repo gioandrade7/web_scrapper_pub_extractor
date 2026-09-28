@@ -158,7 +158,7 @@ def construir_prompt_analise(
         Os `insights` serão inseridos literalmente no prompt de segmentação do próximo ciclo, que processa o documento por janelas e identifica **um bloco por vez**. Portanto:
 
         - Escreva em português, no imperativo, endereçados a quem vai segmentar.
-        - Sejam **concretos e específicos deste documento**: cite os marcadores reais observados (ex.: "Section 3-02", "(a)", "(1)", "(i)", "Art. 5º"), não descrições abstratas.
+        - Sejam **concretos e específicos deste documento**, não descrições abstratas.
         - Digam explicitamente **em que nível hierárquico cortar** e o que **não** agrupar num mesmo bloco.
         - Se houve falha de âncora, incluam orientação sobre como escolher offsets localizáveis.
         - **Nunca instruam a agrupar unidades irmãs** num mesmo bloco só para deixar o resultado mais uniforme: o remédio para granularidade desigual é dividir o bloco englobante, nunca fundir os blocos menores.
@@ -224,10 +224,11 @@ def segmentar_com_correcao(
     constante ao longo de todos os ciclos: o módulo roda **uma vez**, fora
     deste laço, porque a estrutura do documento não muda entre ciclos.
 
-    O loop roda até o analisador aprovar o resultado. Encerra antes disso
-    apenas se ele deixar de produzir diretrizes novas ou repetir as do ciclo
-    anterior — em ambos os casos o ciclo seguinte seria idêntico ao atual.
-    `max_ciclos` é um teto opcional: `0` (padrão) significa sem limite.
+    O loop roda até o analisador aprovar o resultado, ou até ele deixar de
+    produzir diretrizes — sem diretrizes novas não há o que reinjetar no
+    prompt. Não há detecção de estagnação: uma segmentação que se repete
+    indefinidamente sem ser aprovada só é interrompida por `max_ciclos`, o
+    teto opcional, que em `0` (padrão) significa sem limite.
 
     Retorna `(blocos_do_ultimo_ciclo, historico)`.
     """
@@ -278,11 +279,6 @@ def segmentar_com_correcao(
         if not novos_insights:
             print(f"\n  ⚠  Ciclo {ciclo}: analisador apontou problemas mas não produziu "
                   f"diretrizes. Encerrando.\n")
-            break
-
-        if novos_insights == insights.strip():
-            print(f"\n  ⚠  Ciclo {ciclo}: diretrizes idênticas às do ciclo anterior "
-                  f"(sem progresso). Encerrando.\n")
             break
 
         insights = novos_insights
