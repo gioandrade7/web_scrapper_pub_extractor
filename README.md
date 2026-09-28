@@ -1,254 +1,114 @@
-# Pipeline de Extração Semântica de Documentos Jurídicos
+# Pipeline de Segmentação Semântica de Documentos Estruturados
 
-Projeto desenvolvido em colaboração entre o **IComp/UFAM** e o **JusBrasil**, com o objetivo de identificar e extrair automaticamente blocos semânticos de documentos oficiais — publicações do Diário Oficial da União (DOU) e leis federais.
+Pesquisa de mestrado no **IComp/UFAM**: identificar e extrair automaticamente os blocos semânticos de documentos estruturados — descobrir onde cada unidade independente do documento começa e termina.
 
----
+## O problema
 
-## Visão Geral do Pipeline
+Documentos estruturados — um estatuto, uma portaria, um regulamento, um artigo — chegam como um PDF contínuo de dezenas de páginas contendo **muitas unidades independentes**: seções numeradas, artigos, itens. Para qualquer uso a jusante (busca, indexação, análise), é preciso primeiro saber onde cada unidade começa e termina.
 
-```
-┌──────────────────────┐     ┌────────────────────────────────────────┐
-│  text_extraction/    │────▶│           semantic_seg/                │
-│                      │     │                                        │
-│  PDF  → Markdown     │     │  Identificador → Segmentador ⇄ Auditor │
-│  RTF  → Texto        │     │  (padrão)        (blocos)    (correção)│
-└──────────────────────┘     └────────────────────────────────────────┘
-        Etapa 1                            Etapa 2
-```
+Fazer isso por regex ou por regra de layout não generaliza entre coleções: cada uma numera e formata de um jeito — `SEC. 203`, `Section 3-02`, `Art. 14`, `III. METHODOLOGY` — e a mesma fonte muda de formato ao longo dos anos. O corpus do projeto é escolhido por **diversidade estrutural, não por domínio**, justamente porque é essa incompatibilidade entre coleções que torna difícil escrever um único segmentador.
 
-Cada módulo pode ser executado de forma independente. A segmentação é **puramente segmentação**: descobrir onde cada bloco começa e termina. Não há classificação em categorias pré-definidas nem arquivo de configuração por tipo de documento — o prompt é genérico e se especializa em tempo de execução.
+A aposta é que um LLM consegue inferir a estrutura do documento **a partir do próprio documento** e depois aplicá-la, sem configuração por tipo.
 
-> **Nota histórica:** um terceiro módulo, `scraper/`, coletava as publicações do DOU em in.gov.br e foi removido no commit `3781290`. Ele produzia o corpus de referência (`Pub_N.txt`, um arquivo por publicação) que o `avaliar.py` ainda espera como gabarito. Esse corpus não está no repositório — era ignorado pelo git — e não se encontra no disco. Ver [Limitações Conhecidas](#limitações-conhecidas).
+## Visão geral
 
----
+A solução é o pipeline de segmentação, em `semantic_seg/`: três componentes, dois deles num laço. Ele recebe o documento já em **texto paginado** — um arquivo por página — e devolve a lista de blocos.
 
-## Estrutura do Projeto
+A tarefa é **puramente segmentação**: não há classificação em categorias pré-definidas nem arquivo de configuração por tipo de documento — o prompt é genérico e se especializa em tempo de execução.
+
+> **Pré-processamento.** Converter o documento em formato digital em texto paginado é pré-requisito, não parte da solução. O `text_extraction/` está no repositório apenas para isso: lê a camada de texto nativa do documento. Qualquer extrator que produza um arquivo por página serve no lugar dele — o pipeline não sabe de onde o texto veio.
+
+> A escolha do extrator, ainda assim, não é neutra para o resultado: um erro de linearização de colunas na extração chega ao Segmentador como se fosse a ordem real do documento, e o laço de correção não tem como desfazê-lo.
+
+## Os três componentes
 
 ```
-.
-├── README.md                    # Esta documentação
-├── CLAUDE.md                    # Guia para o Claude Code
-├── requirements.txt             # Dependências Python
-│
-├── text_extraction/             # Etapa 1 — Extração de texto
-│   ├── download_pdfs.py         # Baixa edições completas do DOU (PDF)
-│   ├── pdf_extract.py           # PDF → Markdown (camada de texto nativa)
-│   └── rtf_txt.py               # RTF → Texto (leis em formato legado)
-│
-└── semantic_seg/                # Etapa 2 — Segmentação semântica
-    ├── main.py                  # Ponto de entrada (CLI)
-    ├── identificador.py         # Infere o padrão estrutural do documento
-    ├── utils_llm.py             # Janela deslizante + chamadas ao LLM
-    ├── corretor.py              # Auditoria dos blocos e correção iterativa
-    ├── anchor.py                # Localização tolerante de âncoras
-    ├── utils_files.py           # Carregamento e montagem de páginas
-    ├── display.py               # Exibição no terminal
-    └── avaliar.py               # Métricas (Precision/Recall/F1)
+          texto paginado  (`page_NNNN.md`)
+                    │
+                    │  amostra: N páginas contíguas do começo, do meio e do fim
+                    ▼
+          ┌──────────────────────┐
+          │    IDENTIFICADOR     │   1 chamada, antes de qualquer segmentação
+          └──────────────────────┘
+                    │
+                    │  padrão: modo, hierarquia, nível de corte, confiança
+          ┌─────────┴──────────────────────────────┐
+          ▼                                        ▼
+  ┌──────────────────┐                   ┌──────────────────┐
+  │   SEGMENTADOR    │─── blocos ───────▶│     AUDITOR      │
+  │ janela deslizante│  (resumo das      │ cinco patologias │
+  │  1 bloco/chamada │   bordas)         │                  │
+  └──────────────────┘                   └──────────────────┘
+          ▲                                        │
+          │                                   consistente?
+          └────────── insights ───────┬────── não │
+                    (novo ciclo)      │           │ sim
+                                      │           ▼
+                                      │     blocos finais
 ```
 
----
-
-## Instalação
-
-```bash
-pip install -r requirements.txt
-```
-
-Crie um `.env` na raiz com a chave da OpenAI (não há `.env.example` no repositório):
-
-```
-OPENAI_API_KEY=sk-...
-```
-
-A chave é usada **apenas** pelo `semantic_seg/`. O `text_extraction/` não faz nenhuma chamada de API.
-
----
-
-## Etapa 1 — Extração de Texto (`text_extraction/`)
-
-### 1a. Baixar edições do DOU (`download_pdfs.py`)
-
-Busca cada página de uma edição individualmente no `pesquisa.in.gov.br` (8 threads, 3 tentativas, validação dos magic bytes `%PDF`) e funde tudo num PDF único com PyMuPDF.
-
-```bash
-cd text_extraction/
-python download_pdfs.py
-```
-
-> As edições são uma lista `EDITIONS` no início do arquivo: `(data, total_de_páginas, nome_de_saída)`.
-
-**Saída:** `text_extraction/data/pdf/dou_secX_DD-MM.pdf`
-
-### 1b. PDF → Markdown (`pdf_extract.py`)
-
-Lê a **camada de texto nativa** do PDF — sem OCR, sem modelo de ML, sem chamada de API. Três estratégias, escolhidas no momento do import:
-
-1. **pymupdf4llm** — preferencial; detecta colunas, listas e tabelas automaticamente.
-2. **Blocos do PyMuPDF + ordenação por coluna** — fallback heurístico para layout multi-coluna.
-3. **`get_text()` puro** — último recurso, na ordem do stream do PDF.
-
-```bash
-python pdf_extract.py -i arquivo.pdf -o saida/
-python pdf_extract.py -i arquivo.pdf -o saida/ --workers 8   # paralelo
-python pdf_extract.py -i arquivo.pdf -o saida/ --no-resume   # reprocessa do zero
-python pdf_extract.py -i arquivo.pdf -o saida/ --no-final    # sem documento_final.md
-python pdf_extract.py -i arquivo.pdf -o saida/ --chunk-size 4 # páginas por chunk
-```
-
-| Argumento | Descrição | Padrão |
-|---|---|---|
-| `-i` / `--input` | PDF de entrada | obrigatório |
-| `-o` / `--output` | Diretório de saída | obrigatório |
-| `-w` / `--workers` | Processos paralelos | metade dos CPUs |
-| `--chunk-size` | Páginas por chunk de worker | automático |
-| `--no-resume` | Reprocessa todas as páginas | desligado |
-| `--no-final` | Não gera `documento_final.md` | desligado |
-
-**Saída:** `page_NNNN.md` por página (0-indexado, 4 dígitos) e `documento_final.md`.
-
-**Retomada automática:** páginas já processadas são detectadas e puladas. Páginas que extraem menos de 100 caracteres geram aviso — sinal de PDF escaneado, que precisaria de OCR.
-
-Também usável como biblioteca:
-
-```python
-from text_extraction.pdf_extract import extract_pdf
-resultados = extract_pdf("arquivo.pdf", "saida/", workers=4)
-```
-
-### 1c. RTF → Texto (`rtf_txt.py`)
-
-Converte arquivos RTF (leis em formato legado) para texto plano via `striprtf`.
-
-```bash
-python rtf_txt.py
-```
-
-> Edite as variáveis `ano` e `rtf_path` no início do arquivo.
-
----
-
-## Etapa 2 — Segmentação Semântica (`semantic_seg/`)
-
-Três componentes, sendo dois deles um laço:
+Os três componentes são chamadas de LLM — não-determinísticos e com custo por chamada. O que é determinístico no módulo fica fora deles: a montagem do texto paginado e o reencontro das âncoras no documento.
 
 ### Identificador — infere o padrão, uma vez
 
-Antes de qualquer segmentação, lê uma **amostra do texto fonte**: `n` páginas contíguas do começo, `n` do meio e `n` do fim. Devolve a hierarquia do documento, o nível em que cortar os blocos e uma confiança.
+Roda **antes de qualquer segmentação** e recebe o **texto fonte**. É isso que quebra a circularidade do laço: o padrão passa a vir de uma fonte independente daquilo que está sob suspeita.
 
-A contiguidade é deliberada: para saber em que nível cortar, é preciso ver onde uma unidade termina e a próxima começa — uma página isolada mostra apenas o cabeçalho de uma unidade.
+A amostra é de N páginas **contíguas** do começo, N do meio e N do fim. A contiguidade é deliberada: para decidir em que nível cortar, é preciso ver onde uma unidade termina e a próxima começa — uma página isolada mostra apenas o cabeçalho de uma unidade.
+
+Ele responde a duas perguntas: o documento tem padrão estrutural? Se tem, qual é a hierarquia e **em que nível cortar** os blocos. O contrato de saída:
 
 ```json
 {
   "tem_padrao": true,
   "modo": "hierarquico",
   "hierarquia": [
-    {"nivel": 1, "nome": "Seção", "exemplo": "Section 3-02"},
-    {"nivel": 2, "nome": "Subseção alfabética", "exemplo": "(b) Invitation for Bids."}
+    {"nivel": 1, "exemplo": "Section 3-02"},
+    {"nivel": 2, "exemplo": "(a)"},
+    {"nivel": 3, "exemplo": "(1)"}
   ],
-  "nivel_de_corte": 2,
-  "justificativa_corte": "...",
+  "nivel_de_corte": 3,
   "confianca": "alta"
 }
 ```
 
-`modo` pode ser `hierarquico` (níveis encaixados), `sequencia_plana` (unidades independentes de mesmo nível — o caso do DOU, que é uma sucessão de publicações sem enumeração global) ou `topico` (sem padrão; delimitação só por mudança de assunto). `tem_padrao: false` é uma resposta legítima: o módulo não é obrigado a inventar uma hierarquia.
+O `modo` pode ser `hierarquico` (níveis encaixados), `sequencia_plana` (unidades independentes de mesmo nível, numa sucessão sem enumeração global que as amarre) ou `topico` (sem padrão; delimitação só por mudança de assunto).
+
+`tem_padrao: false` é a **válvula de escape que o Auditor não tem**: o schema do Auditor o obriga a devolver um padrão e um veredito, então com entrada subdeterminada ele confabula. O Identificador pode dizer que não há padrão, ou declarar `confianca: "baixa"`.
+
+O `nivel_de_corte` é o parâmetro que, sem o Identificador, o laço tateia por tentativa e erro — cada tentativa custando uma re-segmentação completa do documento.
 
 ### Segmentador — janela deslizante
 
-1. O documento é montado como um único string com marcadores `<!-- PÁGINA N -->`.
-2. Uma janela de N páginas vai ao LLM, que identifica **apenas o primeiro bloco completo**.
-3. O ponteiro de caracteres avança para além do fim do bloco, localizado pela âncora `offset_fim`.
-4. Se o bloco termina na última página da janela, ele pode estar truncado: a janela dobra de tamanho e a chamada é repetida.
+Recebe o texto, o padrão do Identificador e os insights do ciclo anterior. O documento é montado como um único string com marcadores de página; uma janela de N páginas vai ao LLM, que identifica **apenas o primeiro bloco completo** dela. O ponteiro de caracteres avança para além do fim desse bloco e a janela desliza.
 
-As âncoras são reencontradas no texto por `anchor.py`, em cinco camadas de tolerância (exata, parcial, normalizada, normalizada parcial e — só para o fim do bloco — por sufixo), porque o LLM promete copiar literalmente e na prática come marcação markdown, acentos e espaços.
+A posição de cada bloco é devolvida como **âncoras de texto** (`offset_inicio` / `offset_fim`: os primeiros e últimos caracteres do trecho), não como índices. Reencontrá-las no documento é o passo determinístico do módulo, feito em camadas de tolerância crescente, porque o LLM promete copiar literalmente e na prática come marcação markdown, acentos e espaços.
 
-### Auditor — correção iterativa
+Se o bloco termina na última página da janela, ele pode estar truncado: a janela dobra de tamanho e a chamada é repetida.
 
-Recebe um **resumo** dos blocos (páginas, tamanho, título e as bordas: 250 caracteres iniciais e 120 finais) mais o padrão vindo do Identificador. Verifica se a segmentação respeita esse padrão e procura cinco problemas: granularidade desigual, bloco englobante, sobreposição, lacuna e falha de âncora.
+### Auditor — o que exige julgamento
 
-Se reprovar, escreve diretrizes concretas que voltam ao prompt do Segmentador, e o documento é re-segmentado. O laço para quando o auditor aprova, quando não produz diretrizes novas, quando as diretrizes se repetem (o ciclo seguinte seria idêntico) ou no teto de `--max-ciclos`.
+Recebe um **resumo das bordas** dos blocos (páginas, tamanho, título, os primeiros e os últimos caracteres de cada um) **mais o padrão vindo do Identificador** — fonte independente, não a própria saída do laço. Nunca recebe o texto fonte: mandar os blocos inteiros a cada ciclo custaria o mesmo que reenviar o documento.
 
-O Auditor **não deduz** o padrão dos blocos que está julgando — isso seria circular, já que os blocos são o objeto sob suspeita. Com `--sem-identificador` ele volta a deduzir, comportamento anterior mantido para comparação.
+Ele não deduz a estrutura; **confere conformidade** contra a especificação do Identificador e procura cinco patologias:
 
-### Execução
+1. **Granularidade desigual** — blocos de níveis hierárquicos diferentes convivendo no resultado
+2. **Bloco englobante** — um bloco que agrupa várias unidades do padrão, onde cada uma deveria ser um bloco
+3. **Sobreposição ou duplicação** — dois blocos cobrindo essencialmente o mesmo trecho
+4. **Lacuna** — salto entre o fim de um bloco e o início do seguinte, indicando conteúdo não segmentado
+5. **Falha de âncora** — bloco cujas âncoras não foram reencontradas no texto, por não serem literais ou não serem únicas
 
-```bash
-cd semantic_seg/
-python main.py \
-    --diretorio ../text_extraction/ppb_rules_out/paginas \
-    --saida resultados/ppb_rules.json \
-    --janela-paginas 10
-```
+Se reprovar, escreve **diretrizes concretas** que voltam ao prompt do Segmentador, e o documento é re-segmentado do zero.
 
-| Argumento | Descrição | Padrão |
-|---|---|---|
-| `--diretorio` | Pasta com os arquivos `.md` das páginas | obrigatório |
-| `--extensao` | Extensão dos arquivos de página | `.md` |
-| `--saida` | Arquivo JSON para salvar os blocos | nenhum |
-| `--model` | Modelo OpenAI | `gpt-5.6-terra` |
-| `--janela-paginas` | Páginas por janela de contexto | `10` |
-| `--paginas-amostra` | Páginas por região (começo/meio/fim) enviadas ao Identificador | `2` |
-| `--sem-identificador` | Não infere o padrão; o Auditor volta a deduzi-lo dos blocos | desligado |
-| `--max-ciclos` | Teto de ciclos; `0` roda até o Auditor aprovar | `0` |
-| `--sem-correcao` | Uma única passada, sem o Auditor | desligado |
-| `--so-resultado` | Suprime os prompts no terminal | desligado |
+### O laço
 
-**Saída:** `--saida` guarda **somente a lista de blocos**, que é o formato consumido pelo `avaliar.py`. Ao lado dele são escritos:
+Cada ciclo custa uma re-segmentação completa mais uma chamada de auditoria. Ele para quando o Auditor aprova, quando o Auditor reprova mas não produz diretriz nenhuma (sem diretriz não há o que reinjetar), ou quando um teto de ciclos é atingido.
 
-| Arquivo | Conteúdo |
-|---|---|
-| `{saida}_padrao.json` | O padrão identificado, com a procedência da amostra |
-| `{saida}_cicloN.json` | A extração íntegra de cada ciclo |
-| `{saida}_correcao.json` | O rastro da correção: diretrizes e veredito por ciclo |
+**Não há detecção de estagnação:** uma segmentação que se repete ciclo após ciclo sem ser aprovada só é interrompida pelo teto, e o padrão é rodar sem teto. Cada ciclo é salvo em disco, porque **o último não é necessariamente o melhor** — houve caso de o ciclo final ter cobertura menor que um intermediário.
 
-Arquivos existentes **nunca são sobrescritos** — o sufixo `_v2`, `_v3` é acrescentado. Cada rodada custa chamadas de API e o último ciclo não é necessariamente o melhor, então as versões anteriores são material de comparação.
+## Estado atual
 
-**Um bloco na saída:**
+O pipeline roda de ponta a ponta e produz segmentações utilizáveis, mas nenhuma atingiu cobertura total e **não há como medi-las**: não existem anotações de referência nem código de avaliação no repositório.
 
-```json
-{
-  "titulo": "(b) Invitation for Bids",
-  "pagina_inicio": 3,
-  "pagina_fim": 5,
-  "offset_inicio": "primeiros ~80 chars do bloco...",
-  "offset_fim": "últimos ~80 chars do bloco...",
-  "motivo": "Por que esse trecho forma uma unidade coesa",
-  "texto": "Texto completo extraído do bloco..."
-}
-```
+A consequência é que a aprovação do Auditor é um teste de **auto-consistência, não de correção**: ele compara os blocos com uma especificação estrutural, nunca com o documento, então uma segmentação uniformemente errada é um ponto fixo — é aprovada no primeiro ciclo. A validação externa contra gabarito é o próximo passo necessário, e junto com ela o experimento que ainda falta: verificar se a aprovação do Auditor de fato correlaciona com qualidade maior. Se não correlacionar, o critério de parada do laço é ruído.
 
----
-
-## Avaliação (`avaliar.py`)
-
-Compara os blocos preditos com arquivos de referência (um arquivo por bloco esperado) via casamento guloso pelo maior `word_f1`, e calcula:
-
-- **Detecção:** Precision, Recall e F1 — um bloco predito é TP se casa com alguma referência acima do `--threshold`.
-- **Qualidade do texto:** `word_f1` e `char_f1` médios sobre os TPs.
-
-```bash
-python avaliar.py \
-    --resultado resultados/X.json \
-    --anotacoes <diretório de referência> \
-    --threshold 0.5 \
-    --relatorio resultados/X_relatorio.json
-
-# Dataset de leis, com rótulo no nome do arquivo:
-python avaliar.py --formato lei --resultado ... --anotacoes ...
-```
-
-Dois formatos de gabarito: DOU (`Pub_N.txt`, com `classes.json` opcional) e leis (`{seq}-{classe}-{pag_ini}-{pag_fim}.txt`).
-
-> **Resultado histórico** (Precision 0.95 · Recall 0.77 · F1 0.85, DOU Seção 1): obtido com a versão anterior do pipeline, que usava configuração por tipo de documento e fazia classificação. Não é comparável à versão atual e não foi reproduzido desde então.
-
----
-
-## Limitações Conhecidas
-
-- **Não há dados de referência no repositório.** O `avaliar.py` precisa de anotações que não estão presentes em nenhum dos dois formatos — não há `Pub_*.txt`, `classes.json` nem o dataset de leis. Enquanto um corpus não for restaurado, o veredito do laço de correção e o padrão do Identificador só podem ser inspecionados à mão, não medidos.
-- **Rodar o laço até `consistente=true` é um teste de auto-consistência, não de correção.** O Auditor compara a segmentação com uma especificação estrutural, não com o documento inteiro: uma segmentação uniformemente errada é um ponto fixo. A validação externa contra gabarito é a única saída dessa circularidade.
-- **As métricas de classificação do `avaliar.py` estão órfãs.** Ele lê o campo `classificacao` de cada bloco, mas nenhum código o escreve — o prompt atual é só de segmentação. Com `--formato lei` o bloco de classificação roda e imprime `Accuracy: 0/N`.
-- **O Identificador é um ponto único de falha.** O padrão que ele infere entra como critério estrutural nos prompts do Segmentador e do Auditor; se estiver errado, passa a ser fiscalizado fielmente e com mais autoridade do que antes. O `{saida}_padrao.json` existe para deixar isso auditável e a flag `--sem-identificador` para permitir comparação.
-- O `pdf_extract.py` exige camada de texto nativa; PDFs escaneados precisariam de OCR (páginas com menos de 100 caracteres geram aviso).
-- **`semantic_seg/lei.yaml` é vestigial** — seu único consumidor era o `anotar_classes.py`, removido no commit `3781290`. Nenhum código o lê.
-- **`requirements.txt` está desatualizado**: ainda lista as dependências do scraper removido (`selenium`, `beautifulsoup4`, `lxml`, `requests`) e o `marker-pdf`, do pipeline de PDF que o `pdf_extract.py` substituiu. O ChromeDriver não é mais necessário.
+Instruções de execução, flags e os modos de falha já observados estão em [CLAUDE.md](CLAUDE.md).
