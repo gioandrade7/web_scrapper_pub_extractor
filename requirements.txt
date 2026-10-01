@@ -16,3 +16,4 @@ striprtf>=0.0.26           # Conversão RTF → Texto
 # Segmentação semântica via LLM
 openai>=1.30.0             # API OpenAI
 python-dotenv>=1.0.0       # Carregamento do .env (OPENAI_API_KEY)
+matplotlib>=3.8            # Gráfico de P/R/F1 por ciclo em avaliar.py
