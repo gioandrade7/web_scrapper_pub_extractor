@@ -124,8 +124,7 @@ def construir_prompt_analise(
             "próxima tentativa de segmentação."
         )
         instrucao_avaliar = (
-            "Deduza, a partir dos próprios blocos, qual é o padrão estrutural do "
-            "documento. Depois verifique se a segmentação respeita esse padrão de forma "
+            " Verifique se a segmentação respeita o padrão passado de forma "
             "uniforme. Considere a segmentação **inconsistente** se qualquer um destes "
             "problemas ocorrer:"
         )
@@ -148,7 +147,6 @@ def construir_prompt_analise(
         ## O que avaliar
         {instrucao_avaliar}
 
-        1. **Granularidade desigual** — blocos em níveis hierárquicos diferentes convivendo no resultado (ex.: uma seção inteira como um bloco, enquanto subitens equivalentes de outra seção viraram blocos separados).
         2. **Bloco englobante** — um bloco desproporcionalmente extenso que agrupa várias unidades do padrão identificado, quando cada unidade deveria ser um bloco.
         3. **Sobreposição ou duplicação** — dois blocos cobrindo essencialmente o mesmo trecho do documento.
         4. **Lacuna** — salto evidente entre o fim de um bloco e o início do seguinte, indicando conteúdo não segmentado.
@@ -159,7 +157,6 @@ def construir_prompt_analise(
 
         - Escreva em português, no imperativo, endereçados a quem vai segmentar.
         - Sejam **concretos e específicos deste documento**, não descrições abstratas.
-        - Digam explicitamente **em que nível hierárquico cortar** e o que **não** agrupar num mesmo bloco.
         - Se houve falha de âncora, incluam orientação sobre como escolher offsets localizáveis.
         - **Nunca instruam a agrupar unidades irmãs** num mesmo bloco só para deixar o resultado mais uniforme: o remédio para granularidade desigual é dividir o bloco englobante, nunca fundir os blocos menores.
         - Não repitam as regras genéricas que já existem no prompt (literalidade dos offsets, retornar JSON, etc.) — acrescentem apenas o que é específico deste documento.

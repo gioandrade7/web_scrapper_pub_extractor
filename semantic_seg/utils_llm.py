@@ -12,6 +12,18 @@ load_dotenv()
 # Prompt
 # ──────────────────────────────────────────────────────────────────────────────
 
+# Regras que valem em qualquer modo (hierárquico, sequência plana, tópico).
+# `identificador.formatar_padrao` as acrescenta ao fim de cada ramo; sem padrão,
+# `construir_prompt` as usa junto de `ESTRUTURA_RESERVA`.
+
+
+# Usada quando não há padrão a injetar (`--sem-identificador` ou falha do
+# identificador): sem ela o prompt ficaria sem nenhuma definição de bloco.
+ESTRUTURA_RESERVA = f"""
+        ## Estrutura deste documento
+        Um bloco é a **menor unidade de texto que o documento delimita**: começa onde o documento abre uma nova unidade — por um marcador (numeração, rótulo, título) ou, se não houver marcadores, por uma mudança de assunto — e termina imediatamente antes do início da próxima."""
+
+
 def construir_prompt(texto_janela: str, insights: str = "", padrao: str = "") -> str:
     """
     Monta o prompt completo que será enviado ao LLM.
@@ -25,8 +37,9 @@ def construir_prompt(texto_janela: str, insights: str = "", padrao: str = "") ->
 
     `padrao` é a especificação estrutural do documento, produzida pelo módulo
     `identificador` a partir de uma amostra de páginas do **texto fonte**,
-    antes de qualquer segmentação. Diz qual é a hierarquia e em que nível
-    cortar.
+    antes de qualquer segmentação. É a **única** definição de bloco do prompt:
+    diz como as unidades são delimitadas neste documento e termina com as
+    `REGRAS_COMUNS`. Sem padrão, entra `ESTRUTURA_RESERVA` no lugar.
 
     `insights` são diretrizes corretivas escritas pelo módulo `corretor` a
     partir da análise dos blocos de um ciclo anterior. Vêm de falhas
@@ -42,13 +55,11 @@ def construir_prompt(texto_janela: str, insights: str = "", padrao: str = "") ->
 
     return f"""Você é um especialista em segmentação de documentos estruturados.
 
-        ## Definição de bloco semântico
-        Um bloco semântico é uma unidade textual coesa, com início e fim claramente delimitados, que trata de um único assunto ou elemento estrutural do documento. Não há uma lista fixa de tipos de bloco: seu critério é a coesão e os limites naturais do texto, guiados pela própria formatação e estrutura do documento (títulos, numeração, marcadores, mudanças de assunto).
-{padrao}{secao_insights}
+{padrao or ESTRUTURA_RESERVA}{secao_insights}
         ## Sua tarefa
-        Analise o texto do documento fornecido abaixo e identifique **apenas o primeiro bloco semântico completo** presente no texto, conforme a definição acima.
+        Analise o texto do documento fornecido abaixo e identifique **apenas o primeiro bloco completo** presente no texto, conforme a seção *Estrutura deste documento*.
 
-        O texto é composto por múltiplas páginas, cada uma precedida por um marcador `<!-- PÁGINA N -->`. Um bloco semântico pode se estender por mais de uma página.
+        O texto é composto por múltiplas páginas, cada uma precedida por um marcador `<!-- PÁGINA N -->`. Um bloco pode se estender por mais de uma página.
 
         ## Texto do documento
         ```

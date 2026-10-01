@@ -65,7 +65,7 @@ def exibir_padrao(padrao: dict) -> None:
 
     corte = padrao.get("nivel_de_corte")
     nome  = next((h.get("nome") for h in hierarquia if h.get("nivel") == corte), "")
-    print(f"  Corte      : nível {corte}" + (f" ({nome})" if nome else ""))
+    print(f"  Corte      : nível {corte}" + (f" ({nome})" if nome else "") + "  [só registro: o prompt corta em todo marcador]")
 
     justificativa = (padrao.get("justificativa_corte") or "").strip()
     if justificativa:
